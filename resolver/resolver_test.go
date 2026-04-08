@@ -103,6 +103,39 @@ func TestCycleDetection(t *testing.T) {
 	}
 }
 
+func TestThreeNodeCycle(t *testing.T) {
+	fragments := []*parser.Fragment{
+		makeFrag("a", "b"),
+		makeFrag("b", "c"),
+		makeFrag("c", "a"),
+	}
+	imports := []string{"a"}
+
+	_, err := Resolve(imports, fragments)
+	if err == nil {
+		t.Fatal("expected cycle error for 3-node cycle, got nil")
+	}
+	if !strings.Contains(err.Error(), "circular") {
+		t.Errorf("error should mention circular dependency, got: %s", err.Error())
+	}
+}
+
+func TestCycleDetectionWithBacktracking(t *testing.T) {
+	// a -> x, a -> y, y -> y (self-cycle)
+	// DFS from a explores x first (no cycle), backtracks, then finds y -> y
+	fragments := []*parser.Fragment{
+		makeFrag("a", "x", "y"),
+		makeFrag("x"),
+		makeFrag("y", "y"),
+	}
+	imports := []string{"a"}
+
+	_, err := Resolve(imports, fragments)
+	if err == nil {
+		t.Fatal("expected cycle error with backtracking, got nil")
+	}
+}
+
 func TestMissingDependency(t *testing.T) {
 	fragments := []*parser.Fragment{
 		makeFrag("a", "nonexistent"),

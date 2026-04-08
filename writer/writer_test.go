@@ -101,3 +101,32 @@ func TestWriteEmptyPhase(t *testing.T) {
 		t.Errorf("bashenv should be empty, got %q", string(data))
 	}
 }
+
+func TestWriteMkdirAllError(t *testing.T) {
+	// /dev/null is not a directory, so MkdirAll("/dev/null/sub") should fail
+	outputs := []ShellOutput{
+		{Shell: "bash", Phase: "main", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
+	}
+	err := Write("/dev/null/subdir", outputs)
+	if err == nil {
+		t.Error("expected error for MkdirAll on /dev/null/subdir")
+	}
+}
+
+func TestWriteFileError(t *testing.T) {
+	dir := t.TempDir()
+	// Create a file where the output directory should be
+	blockFile := filepath.Join(dir, "output")
+	if err := os.WriteFile(blockFile, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	outputs := []ShellOutput{
+		{Shell: "bash", Phase: "main", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
+	}
+	// MkdirAll on a path where a regular file blocks directory creation
+	err := Write(filepath.Join(blockFile, "sub"), outputs)
+	if err == nil {
+		t.Error("expected error when writing to blocked path")
+	}
+}

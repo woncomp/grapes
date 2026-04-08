@@ -124,6 +124,14 @@ func TestUninstall(t *testing.T) {
 	}
 }
 
+func TestUninstallNonExistent(t *testing.T) {
+	dir := t.TempDir()
+	rcFile := filepath.Join(dir, ".bashrc") // never created
+	if err := Uninstall(rcFile); err != nil {
+		t.Fatal(err) // should return nil for non-existent file
+	}
+}
+
 func TestDetectBashProfile(t *testing.T) {
 	dir := t.TempDir()
 

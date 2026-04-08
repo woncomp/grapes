@@ -147,3 +147,27 @@ body
 		t.Errorf("error should mention invalid phase, got: %s", err.Error())
 	}
 }
+
+func TestParseUnterminatedFrontmatter(t *testing.T) {
+	dir := t.TempDir()
+	content := `---
+deps:
+  - path
+`
+	path := writeTempFile(t, dir, "bad.grape", content)
+
+	_, err := ParseFile(path)
+	if err == nil {
+		t.Error("expected error for unterminated frontmatter, got nil")
+	}
+	if !strings.Contains(err.Error(), "unterminated") {
+		t.Errorf("error should mention unterminated, got: %s", err.Error())
+	}
+}
+
+func TestParseNonExistentFile(t *testing.T) {
+	_, err := ParseFile("/nonexistent/path.grape")
+	if err == nil {
+		t.Error("expected error for non-existent file, got nil")
+	}
+}

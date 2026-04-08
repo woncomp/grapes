@@ -142,3 +142,43 @@ func TestMultipleDirectives(t *testing.T) {
 		t.Errorf("bash: got %q, want %q", result, expected)
 	}
 }
+
+func TestIfdefWrongArgCount(t *testing.T) {
+	input := "#ifdef A B\necho hi\n#endif\n"
+	_, err := Process(input, "bash")
+	if err == nil {
+		t.Error("expected error for #ifdef with wrong arg count")
+	}
+}
+
+func TestIfndefWrongArgCount(t *testing.T) {
+	input := "#ifndef A B\necho hi\n#endif\n"
+	_, err := Process(input, "bash")
+	if err == nil {
+		t.Error("expected error for #ifndef with wrong arg count")
+	}
+}
+
+func TestOrphanElif(t *testing.T) {
+	input := "#elif BASH\necho hi\n"
+	_, err := Process(input, "bash")
+	if err == nil {
+		t.Error("expected error for orphan #elif")
+	}
+}
+
+func TestOrphanElse(t *testing.T) {
+	input := "#else\necho hi\n"
+	_, err := Process(input, "bash")
+	if err == nil {
+		t.Error("expected error for orphan #else")
+	}
+}
+
+func TestOrphanEndif(t *testing.T) {
+	input := "#endif\n"
+	_, err := Process(input, "bash")
+	if err == nil {
+		t.Error("expected error for orphan #endif")
+	}
+}
