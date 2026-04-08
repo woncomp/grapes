@@ -65,6 +65,11 @@ func ParseFile(path string) (*Fragment, error) {
 
 	frag.Body = body
 
+	// Validate phase
+	if frag.Phase != "env" && frag.Phase != "main" {
+		return nil, fmt.Errorf("invalid phase %q in %s (must be \"env\" or \"main\")", frag.Phase, path)
+	}
+
 	return frag, nil
 }
 

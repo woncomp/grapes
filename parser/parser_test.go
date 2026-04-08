@@ -129,3 +129,21 @@ body
 		t.Error("expected error for invalid YAML, got nil")
 	}
 }
+
+func TestParseInvalidPhase(t *testing.T) {
+	dir := t.TempDir()
+	content := `---
+phase: unknown
+---
+body
+`
+	path := writeTempFile(t, dir, "bad.grape", content)
+
+	_, err := ParseFile(path)
+	if err == nil {
+		t.Error("expected error for invalid phase, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid phase") {
+		t.Errorf("error should mention invalid phase, got: %s", err.Error())
+	}
+}
