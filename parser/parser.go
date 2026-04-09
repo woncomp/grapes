@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,10 +35,43 @@ func ParseFile(path string) (*Fragment, error) {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 
-	content := string(data)
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	isMaster := filepath.Ext(path) == ".grapes"
+	frag, err := parseContent(name, string(data), path, isMaster)
+	if err != nil {
+		return nil, err
+	}
+	return frag, nil
+}
 
+// ParseString parses a fragment from string content (used for embedded fragments).
+func ParseString(name, content string) (*Fragment, error) {
+	return parseContent(name, content, "<embedded:"+name+">", false)
+}
+
+// ParseFileOrEmbedded tries to load a fragment from a local directory first,
+// falling back to the embedded filesystem.
+func ParseFileOrEmbedded(dir, name string, embedFS embed.FS) (*Fragment, error) {
+	localPath := filepath.Join(dir, name+".grape")
+	data, err := os.ReadFile(localPath)
+	if err == nil {
+		frag, err := parseContent(name, string(data), localPath, false)
+		return frag, err
+	}
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("reading %s: %w", localPath, err)
+	}
+
+	// Fall back to embedded
+	embedData, embedErr := embedFS.ReadFile(name + ".grape")
+	if embedErr != nil {
+		return nil, fmt.Errorf("reading %s: %w", localPath, os.ErrNotExist)
+	}
+	return ParseString(name, string(embedData))
+}
+
+// parseContent is the shared internal parser for any content source.
+func parseContent(name, content, path string, isMaster bool) (*Fragment, error) {
 	frag := &Fragment{
 		Name:     name,
 		Path:     path,
@@ -45,7 +79,6 @@ func ParseFile(path string) (*Fragment, error) {
 		IsMaster: isMaster,
 	}
 
-	// Split on --- delimiters for frontmatter
 	body, fm, err := splitFrontmatter(content)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)

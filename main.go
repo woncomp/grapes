@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/woncomp/grapes/fragments"
 	"github.com/woncomp/grapes/lazy"
 	"github.com/woncomp/grapes/parser"
 	"github.com/woncomp/grapes/preprocessor"
@@ -137,7 +138,7 @@ func run(masterPath string, doLazy bool) error {
 // reachable from the given import list.
 func parseAllFragments(dir string, imports []string) ([]*parser.Fragment, error) {
 	seen := make(map[string]bool)
-	var fragments []*parser.Fragment
+	var frags []*parser.Fragment
 
 	var collect func(name string) error
 	collect = func(name string) error {
@@ -146,12 +147,11 @@ func parseAllFragments(dir string, imports []string) ([]*parser.Fragment, error)
 		}
 		seen[name] = true
 
-		path := filepath.Join(dir, name+".grape")
-		frag, err := parser.ParseFile(path)
+		frag, err := parser.ParseFileOrEmbedded(dir, name, fragments.FS)
 		if err != nil {
 			return err
 		}
-		fragments = append(fragments, frag)
+		frags = append(frags, frag)
 
 		for _, dep := range frag.Deps {
 			if err := collect(dep); err != nil {
@@ -167,5 +167,5 @@ func parseAllFragments(dir string, imports []string) ([]*parser.Fragment, error)
 		}
 	}
 
-	return fragments, nil
+	return frags, nil
 }

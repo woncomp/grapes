@@ -1,0 +1,10 @@
+---
+phase: main
+---
+#ifdef BASH
+eval "$(fzf --bash)"
+#endif
+
+#ifdef ZSH
+source <(fzf --zsh)
+#endif
