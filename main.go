@@ -82,17 +82,19 @@ func run(masterPath string, doLazy bool) error {
 		for _, phase := range phases {
 			var frags []writer.Fragment
 			for _, f := range sorted {
-				if f.Phase != phase {
-					continue
+				for _, block := range f.Blocks {
+					if block.Phase != phase {
+						continue
+					}
+					content, err := preprocessor.Process(block.Body, shell)
+					if err != nil {
+						return fmt.Errorf("preprocessing %s for %s: %w", f.Name, shell, err)
+					}
+					frags = append(frags, writer.Fragment{
+						Name:    f.Name,
+						Content: content,
+					})
 				}
-				content, err := preprocessor.Process(f.Body, shell)
-				if err != nil {
-					return fmt.Errorf("preprocessing %s for %s: %w", f.Name, shell, err)
-				}
-				frags = append(frags, writer.Fragment{
-					Name:    f.Name,
-					Content: content,
-				})
 			}
 			outputs = append(outputs, writer.ShellOutput{
 				Shell:     shell,

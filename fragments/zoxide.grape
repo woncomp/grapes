@@ -1,10 +1,4 @@
 ---
 phase: main
 ---
-#ifdef BASH
-eval "$(zoxide init bash)"
-#endif
-
-#ifdef ZSH
-eval "$(zoxide init zsh)"
-#endif
+eval "$(zoxide init $__GRAPES_SHELL)"

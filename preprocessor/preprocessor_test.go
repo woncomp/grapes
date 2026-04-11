@@ -5,14 +5,31 @@ import (
 	"testing"
 )
 
+func shellLine(shell string) string {
+	return `export __GRAPES_SHELL="` + shell + `"` + "\n"
+}
+
 func TestNoDirectives(t *testing.T) {
 	input := "export FOO=bar\necho hello\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != input {
-		t.Errorf("got %q, want %q", result, input)
+	expected := shellLine("bash") + input
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+}
+
+func TestShellInjection(t *testing.T) {
+	for _, shell := range []string{"bash", "zsh"} {
+		result, err := Process("echo hi\n", shell)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(result, `__GRAPES_SHELL="`+shell+`"`) {
+			t.Errorf("output should contain __GRAPES_SHELL=%q, got: %q", shell, result)
+		}
 	}
 }
 
@@ -22,7 +39,7 @@ func TestIfdefMatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "echo bash\necho common\n"
+	expected := shellLine("bash") + "echo bash\necho common\n"
 	if result != expected {
 		t.Errorf("got %q, want %q", result, expected)
 	}
@@ -34,7 +51,7 @@ func TestIfdefNoMatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "echo common\n"
+	expected := shellLine("zsh") + "echo common\n"
 	if result != expected {
 		t.Errorf("got %q, want %q", result, expected)
 	}
@@ -46,15 +63,16 @@ func TestIfndef(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != "" {
-		t.Errorf("got %q, want empty", result)
+	expected := shellLine("bash")
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
 	}
 
 	result, err = Process(input, "zsh")
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "echo not-bash\n"
+	expected = shellLine("zsh") + "echo not-bash\n"
 	if result != expected {
 		t.Errorf("got %q, want %q", result, expected)
 	}
@@ -66,7 +84,7 @@ func TestElse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "echo bash\n"
+	expected := shellLine("bash") + "echo bash\n"
 	if result != expected {
 		t.Errorf("bash: got %q, want %q", result, expected)
 	}
@@ -75,7 +93,7 @@ func TestElse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected = "echo other\n"
+	expected = shellLine("zsh") + "echo other\n"
 	if result != expected {
 		t.Errorf("zsh: got %q, want %q", result, expected)
 	}
@@ -87,16 +105,16 @@ func TestElif(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != "echo bash\n" {
-		t.Errorf("bash: got %q, want %q", result, "echo bash\n")
+	if result != shellLine("bash")+"echo bash\n" {
+		t.Errorf("bash: got %q", result)
 	}
 
 	result, err = Process(input, "zsh")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != "echo zsh\n" {
-		t.Errorf("zsh: got %q, want %q", result, "echo zsh\n")
+	if result != shellLine("zsh")+"echo zsh\n" {
+		t.Errorf("zsh: got %q", result)
 	}
 }
 
@@ -106,7 +124,7 @@ func TestNestedDirectives(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "echo bash-only\n"
+	expected := shellLine("bash") + "echo bash-only\n"
 	if result != expected {
 		t.Errorf("got %q, want %q", result, expected)
 	}
@@ -137,7 +155,7 @@ func TestMultipleDirectives(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "export PATH=/bin\nexport BASH_VAR=1\necho done\n"
+	expected := shellLine("bash") + "export PATH=/bin\nexport BASH_VAR=1\necho done\n"
 	if result != expected {
 		t.Errorf("bash: got %q, want %q", result, expected)
 	}

@@ -1,6 +1,7 @@
 package fragments
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/woncomp/grapes/parser"
@@ -31,18 +32,29 @@ func TestEmbeddedFragmentsValid(t *testing.T) {
 				t.Fatalf("ParseString failed: %v", err)
 			}
 
-			if frag.Phase != "env" && frag.Phase != "main" {
-				t.Errorf("invalid phase %q", frag.Phase)
-			}
-			if frag.Body == "" {
-				t.Error("body is empty")
+			if len(frag.Blocks) == 0 {
+				t.Fatal("no blocks found")
 			}
 
-			// Must preprocess without errors for both shells
-			for _, shell := range []string{"bash", "zsh"} {
-				_, err := preprocessor.Process(frag.Body, shell)
-				if err != nil {
-					t.Errorf("preprocessing for %s failed: %v", shell, err)
+			for i, block := range frag.Blocks {
+				if block.Phase != "env" && block.Phase != "main" {
+					t.Errorf("block %d: invalid phase %q", i, block.Phase)
+				}
+
+				hasContent := block.Body != "" || len(block.Env) > 0 || len(block.Paths) > 0
+				if !hasContent {
+					t.Errorf("block %d: has no content", i)
+				}
+
+				// Must preprocess without errors for both shells
+				for _, shell := range []string{"bash", "zsh"} {
+					out, err := preprocessor.Process(block.Body, shell)
+					if err != nil {
+						t.Errorf("block %d: preprocessing for %s failed: %v", i, shell, err)
+					}
+					if !strings.Contains(out, `__GRAPES_SHELL="`+shell+`"`) {
+						t.Errorf("block %d: preprocessor should inject __GRAPES_SHELL for %s", i, shell)
+					}
 				}
 			}
 		})

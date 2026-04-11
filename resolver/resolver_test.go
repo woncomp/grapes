@@ -11,7 +11,7 @@ func makeFrag(name string, deps ...string) *parser.Fragment {
 	return &parser.Fragment{
 		Name:  name,
 		Deps:  deps,
-		Phase: "main",
+		Blocks: []parser.Block{{Phase: "main"}},
 	}
 }
 

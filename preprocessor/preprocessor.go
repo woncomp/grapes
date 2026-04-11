@@ -9,7 +9,7 @@ import (
 // Supported directives: #ifdef, #ifndef, #elif, #else, #endif.
 func Process(body string, shell string) (string, error) {
 	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
-	var output []string
+	output := []string{fmt.Sprintf(`export __GRAPES_SHELL="%s"`, shell)}
 	stack := []blockState{{include: true, satisfied: true}}
 
 	for i, line := range lines {

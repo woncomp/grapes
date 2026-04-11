@@ -1,5 +1,7 @@
 ---
 phase: env
+env:
+  GOPATH: "${GOPATH:-$HOME/go}"
+paths:
+  - $GOPATH/bin
 ---
-export GOPATH="${GOPATH:-$HOME/go}"
-export PATH="$GOPATH/bin:$PATH"

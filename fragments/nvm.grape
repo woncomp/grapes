@@ -1,14 +1,13 @@
 ---
 phase: main
+env:
+  NVM_DIR: "${NVM_DIR:-$HOME/.nvm}"
 ---
-#ifdef BASH
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+#ifdef BASH
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 #endif
 
 #ifdef ZSH
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/zsh_completion" ] && . "$NVM_DIR/zsh_completion"
 #endif

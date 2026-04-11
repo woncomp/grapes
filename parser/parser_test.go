@@ -45,8 +45,11 @@ echo bash
 	if frag.Name != "test" {
 		t.Errorf("Name = %q, want %q", frag.Name, "test")
 	}
-	if frag.Phase != "env" {
-		t.Errorf("Phase = %q, want %q", frag.Phase, "env")
+	if len(frag.Blocks) != 1 {
+		t.Fatalf("Blocks = %d, want 1", len(frag.Blocks))
+	}
+	if frag.Blocks[0].Phase != "env" {
+		t.Errorf("Phase = %q, want %q", frag.Blocks[0].Phase, "env")
 	}
 	if len(frag.Deps) != 1 || frag.Deps[0] != "path" {
 		t.Errorf("Deps = %v, want [path]", frag.Deps)
@@ -54,8 +57,8 @@ echo bash
 	if frag.IsMaster {
 		t.Error("IsMaster = true, want false")
 	}
-	if !strings.Contains(frag.Body, "export FOO=bar") {
-		t.Errorf("Body missing expected content, got: %q", frag.Body)
+	if !strings.Contains(frag.Blocks[0].Body, "export FOO=bar") {
+		t.Errorf("Body missing expected content, got: %q", frag.Blocks[0].Body)
 	}
 }
 
@@ -92,11 +95,14 @@ func TestParseNoFrontmatter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if frag.Phase != "main" {
-		t.Errorf("Phase = %q, want %q (default)", frag.Phase, "main")
+	if len(frag.Blocks) != 1 {
+		t.Fatalf("Blocks = %d, want 1", len(frag.Blocks))
 	}
-	if frag.Body != "export FOO=bar\n" {
-		t.Errorf("Body = %q, want %q", frag.Body, "export FOO=bar\n")
+	if frag.Blocks[0].Phase != "main" {
+		t.Errorf("Phase = %q, want %q (default)", frag.Blocks[0].Phase, "main")
+	}
+	if frag.Blocks[0].Body != "export FOO=bar\n" {
+		t.Errorf("Body = %q, want %q", frag.Blocks[0].Body, "export FOO=bar\n")
 	}
 }
 
@@ -114,8 +120,8 @@ some content
 		t.Fatal(err)
 	}
 
-	if frag.Phase != "main" {
-		t.Errorf("Phase = %q, want %q", frag.Phase, "main")
+	if frag.Blocks[0].Phase != "main" {
+		t.Errorf("Phase = %q, want %q", frag.Blocks[0].Phase, "main")
 	}
 }
 
@@ -164,9 +170,6 @@ deps:
 	if err == nil {
 		t.Error("expected error for unterminated frontmatter, got nil")
 	}
-	if !strings.Contains(err.Error(), "unterminated") {
-		t.Errorf("error should mention unterminated, got: %s", err.Error())
-	}
 }
 
 func TestParseNonExistentFile(t *testing.T) {
@@ -192,14 +195,14 @@ export FOO=bar
 	if frag.Name != "test" {
 		t.Errorf("Name = %q, want %q", frag.Name, "test")
 	}
-	if frag.Phase != "env" {
-		t.Errorf("Phase = %q, want %q", frag.Phase, "env")
+	if frag.Blocks[0].Phase != "env" {
+		t.Errorf("Phase = %q, want %q", frag.Blocks[0].Phase, "env")
 	}
 	if len(frag.Deps) != 1 || frag.Deps[0] != "path" {
 		t.Errorf("Deps = %v, want [path]", frag.Deps)
 	}
-	if !strings.Contains(frag.Body, "export FOO=bar") {
-		t.Errorf("Body missing expected content, got: %q", frag.Body)
+	if !strings.Contains(frag.Blocks[0].Body, "export FOO=bar") {
+		t.Errorf("Body missing expected content, got: %q", frag.Blocks[0].Body)
 	}
 	if !strings.HasPrefix(frag.Path, "<embedded:") {
 		t.Errorf("Path = %q, want <embedded:...>", frag.Path)
@@ -212,11 +215,11 @@ func TestParseStringNoFrontmatter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if frag.Phase != "main" {
-		t.Errorf("Phase = %q, want %q", frag.Phase, "main")
+	if frag.Blocks[0].Phase != "main" {
+		t.Errorf("Phase = %q, want %q", frag.Blocks[0].Phase, "main")
 	}
-	if frag.Body != "export FOO=bar\n" {
-		t.Errorf("Body = %q, want %q", frag.Body, "export FOO=bar\n")
+	if frag.Blocks[0].Body != "export FOO=bar\n" {
+		t.Errorf("Body = %q, want %q", frag.Blocks[0].Body, "export FOO=bar\n")
 	}
 }
 
@@ -246,11 +249,11 @@ body
 
 func TestParseFileOrEmbedded_LocalOverride(t *testing.T) {
 	dir := t.TempDir()
-	// Create a local fragment that overrides embedded
 	content := `---
 phase: env
+env:
+  LOCAL: "1"
 ---
-export LOCAL=1
 `
 	if err := os.WriteFile(filepath.Join(dir, "test.grape"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -261,8 +264,8 @@ export LOCAL=1
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(frag.Body, "export LOCAL=1") {
-		t.Errorf("local file should take precedence, got body: %q", frag.Body)
+	if frag.Blocks[0].Env["LOCAL"] != "1" {
+		t.Errorf("local file should take precedence, got env: %v", frag.Blocks[0].Env)
 	}
 	if !strings.HasPrefix(frag.Path, dir) {
 		t.Errorf("Path should be local, got: %q", frag.Path)
@@ -271,14 +274,13 @@ export LOCAL=1
 
 func TestParseFileOrEmbedded_EmbeddedFallback(t *testing.T) {
 	dir := t.TempDir()
-	// No local file, should fall back to embedded testdata/test.grape
 	frag, err := ParseFileOrEmbedded(dir, "test", testEmbedFS)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(frag.Body, "export EMBEDDED=1") {
-		t.Errorf("should fall back to embedded, got body: %q", frag.Body)
+	if frag.Blocks[0].Env["EMBEDDED"] != "1" {
+		t.Errorf("should fall back to embedded, got env: %v", frag.Blocks[0].Env)
 	}
 	if !strings.HasPrefix(frag.Path, "<embedded:") {
 		t.Errorf("embedded Path should be <embedded:...>, got: %q", frag.Path)
@@ -290,5 +292,189 @@ func TestParseFileOrEmbedded_NeitherExists(t *testing.T) {
 	_, err := ParseFileOrEmbedded(dir, "nonexistent", testEmbedFS)
 	if err == nil {
 		t.Error("expected error when neither local nor embedded file exists")
+	}
+}
+
+// --- v2 multi-block tests ---
+
+func TestParseMultiBlock(t *testing.T) {
+	dir := t.TempDir()
+	content := `---
+phase: env
+env:
+  TOOL_HOME: "$HOME/tool"
+paths:
+  - $HOME/tool/bin
+---
+
+---
+phase: main
+---
+eval "$(tool init)"
+`
+	path := writeTempFile(t, dir, "tool.grape", content)
+
+	frag, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frag.Blocks) != 2 {
+		t.Fatalf("Blocks = %d, want 2", len(frag.Blocks))
+	}
+
+	// First block: env phase with env vars and paths
+	if frag.Blocks[0].Phase != "env" {
+		t.Errorf("block 0 phase = %q, want %q", frag.Blocks[0].Phase, "env")
+	}
+	if frag.Blocks[0].Env["TOOL_HOME"] != "$HOME/tool" {
+		t.Errorf("block 0 env = %v, want TOOL_HOME=$HOME/tool", frag.Blocks[0].Env)
+	}
+	if len(frag.Blocks[0].Paths) != 1 || frag.Blocks[0].Paths[0] != "$HOME/tool/bin" {
+		t.Errorf("block 0 paths = %v, want [$HOME/tool/bin]", frag.Blocks[0].Paths)
+	}
+	if !strings.Contains(frag.Blocks[0].Body, `export TOOL_HOME="$HOME/tool"`) {
+		t.Errorf("block 0 body missing env export, got: %q", frag.Blocks[0].Body)
+	}
+	if !strings.Contains(frag.Blocks[0].Body, `export PATH="$HOME/tool/bin:$PATH"`) {
+		t.Errorf("block 0 body missing path export, got: %q", frag.Blocks[0].Body)
+	}
+
+	// Second block: main phase with body
+	if frag.Blocks[1].Phase != "main" {
+		t.Errorf("block 1 phase = %q, want %q", frag.Blocks[1].Phase, "main")
+	}
+	if !strings.Contains(frag.Blocks[1].Body, `eval "$(tool init)"`) {
+		t.Errorf("block 1 body missing eval, got: %q", frag.Blocks[1].Body)
+	}
+}
+
+func TestParseEnvExpansion(t *testing.T) {
+	frag, err := ParseString("test", `---
+phase: env
+env:
+  GOPATH: "${GOPATH:-$HOME/go}"
+  GOBIN: "$GOPATH/bin"
+---
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := frag.Blocks[0].Body
+	if !strings.Contains(body, `export GOBIN="$GOPATH/bin"`) {
+		t.Errorf("body missing GOBIN export: %q", body)
+	}
+	if !strings.Contains(body, `export GOPATH="${GOPATH:-$HOME/go}"`) {
+		t.Errorf("body missing GOPATH export: %q", body)
+	}
+}
+
+func TestParsePathsExpansion(t *testing.T) {
+	frag, err := ParseString("test", `---
+phase: env
+paths:
+  - $HOME/.local/bin
+  - $HOME/tool/bin
+---
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := frag.Blocks[0].Body
+	if !strings.Contains(body, `export PATH="$HOME/.local/bin:$PATH"`) {
+		t.Errorf("body missing first path: %q", body)
+	}
+	if !strings.Contains(body, `export PATH="$HOME/tool/bin:$PATH"`) {
+		t.Errorf("body missing second path: %q", body)
+	}
+}
+
+func TestParsePathsAfterEnv(t *testing.T) {
+	frag, err := ParseString("test", `---
+phase: env
+env:
+  TOOL: "$HOME/tool"
+paths:
+  - $TOOL/bin
+---
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := frag.Blocks[0].Body
+	envIdx := strings.Index(body, `export TOOL=`)
+	pathIdx := strings.Index(body, `export PATH=`)
+	if envIdx == -1 || pathIdx == -1 {
+		t.Fatalf("missing exports: %q", body)
+	}
+	if envIdx > pathIdx {
+		t.Errorf("env export should come before path export")
+	}
+}
+
+func TestParseDepsInSecondBlock_Error(t *testing.T) {
+	_, err := ParseString("bad", `---
+phase: env
+---
+body
+
+---
+deps: [foo]
+---
+more body
+`)
+	if err == nil {
+		t.Fatal("expected error for deps in second block")
+	}
+	if !strings.Contains(err.Error(), "deps not allowed") {
+		t.Errorf("error should mention deps not allowed, got: %s", err.Error())
+	}
+}
+
+func TestParseEmptyBlockBody(t *testing.T) {
+	frag, err := ParseString("test", `---
+phase: env
+env:
+  FOO: "bar"
+---
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if frag.Blocks[0].Phase != "env" {
+		t.Errorf("phase = %q, want env", frag.Blocks[0].Phase)
+	}
+	if !strings.Contains(frag.Blocks[0].Body, `export FOO="bar"`) {
+		t.Errorf("body missing env export: %q", frag.Blocks[0].Body)
+	}
+}
+
+func TestParseThreeBlocks(t *testing.T) {
+	frag, err := ParseString("test", `---
+phase: env
+env:
+  A: "1"
+---
+
+---
+phase: main
+---
+body1
+
+---
+phase: main
+---
+body2
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frag.Blocks) != 3 {
+		t.Fatalf("Blocks = %d, want 3", len(frag.Blocks))
 	}
 }

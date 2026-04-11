@@ -3,29 +3,46 @@ package parser
 import (
 	"embed"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+// Block represents one frontmatter+body section within a .grape file.
+type Block struct {
+	Phase string            // "env" or "main"
+	Env   map[string]string // first-class env vars
+	Paths []string          // first-class PATH entries
+	Body  string            // raw shell code (after env/paths expansion)
+}
+
 // Fragment represents a parsed .grape or .grapes file.
 type Fragment struct {
 	Name     string   // filename without extension
 	Path     string   // full file path
-	Phase    string   // "env" or "main"
-	Deps     []string // fragment dependencies
+	Deps     []string // fragment dependencies (from first block only)
 	Imports  []string // master-only: fragments to include
 	IsMaster bool     // true if this is a .grapes file
-	Body     string   // raw body after frontmatter
+	Blocks   []Block  // multi-block structure (replaces old Phase + Body)
 }
 
 // frontmatter is the YAML structure parsed from between --- delimiters.
 type frontmatter struct {
-	Deps    []string `yaml:"deps"`
-	Phase   string   `yaml:"phase"`
-	Imports []string `yaml:"imports"`
+	Deps    []string          `yaml:"deps"`
+	Phase   string            `yaml:"phase"`
+	Env     map[string]string `yaml:"env"`
+	Paths   []string          `yaml:"paths"`
+	Imports []string          `yaml:"imports"`
+}
+
+// rawBlock holds the raw frontmatter YAML and body string before parsing.
+type rawBlock struct {
+	Frontmatter string // YAML content between --- delimiters (empty if no frontmatter)
+	Body        string // body content after closing ---
 }
 
 // ParseFile reads a .grape or .grapes file and returns a Fragment.
@@ -75,60 +92,158 @@ func parseContent(name, content, path string, isMaster bool) (*Fragment, error) 
 	frag := &Fragment{
 		Name:     name,
 		Path:     path,
-		Phase:    "main",
 		IsMaster: isMaster,
 	}
 
-	body, fm, err := splitFrontmatter(content)
-	if err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
+	rawBlocks, splitErr := splitBlocks(content)
+	if splitErr != nil {
+		return nil, fmt.Errorf("parsing %s: %w", path, splitErr)
 	}
 
-	if fm != nil {
+	for i, rb := range rawBlocks {
 		var parsed frontmatter
-		if err := yaml.Unmarshal([]byte(*fm), &parsed); err != nil {
-			return nil, fmt.Errorf("parsing frontmatter in %s: %w", path, err)
+		if rb.Frontmatter != "" {
+			if err := yaml.Unmarshal([]byte(rb.Frontmatter), &parsed); err != nil {
+				return nil, fmt.Errorf("parsing frontmatter block %d in %s: %w", i+1, path, err)
+			}
 		}
-		frag.Deps = parsed.Deps
-		frag.Imports = parsed.Imports
-		if parsed.Phase != "" {
-			frag.Phase = parsed.Phase
+
+		// deps only allowed in first block
+		if i > 0 && len(parsed.Deps) > 0 {
+			return nil, fmt.Errorf("deps not allowed in block %d of %s (only first block)", i+1, path)
 		}
+
+		// imports only in master files, first block
+		if i > 0 && len(parsed.Imports) > 0 {
+			return nil, fmt.Errorf("imports not allowed in block %d of %s (only first block)", i+1, path)
+		}
+
+		// First block captures deps/imports
+		if i == 0 {
+			frag.Deps = parsed.Deps
+			frag.Imports = parsed.Imports
+		}
+
+		// Default phase
+		phase := parsed.Phase
+		if phase == "" {
+			phase = "main"
+		}
+
+		// Validate phase
+		if phase != "env" && phase != "main" {
+			return nil, fmt.Errorf("invalid phase %q in block %d of %s (must be \"env\" or \"main\")", phase, i+1, path)
+		}
+
+		block := Block{
+			Phase: phase,
+			Env:   parsed.Env,
+			Paths: parsed.Paths,
+			Body:  expandBlock(&parsed, rb.Body),
+		}
+		frag.Blocks = append(frag.Blocks, block)
 	}
 
-	frag.Body = body
-
-	// Validate phase
-	if frag.Phase != "env" && frag.Phase != "main" {
-		return nil, fmt.Errorf("invalid phase %q in %s (must be \"env\" or \"main\")", frag.Phase, path)
+	// Ensure at least one block
+	if len(frag.Blocks) == 0 {
+		frag.Blocks = append(frag.Blocks, Block{
+			Phase: "main",
+			Body:  content,
+		})
 	}
 
 	return frag, nil
 }
 
-// splitFrontmatter splits content into body and optional YAML frontmatter.
-// Frontmatter is delimited by --- on its own line.
-func splitFrontmatter(content string) (body string, fm *string, err error) {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return content, nil, nil
+// expandBlock assembles the final body for a block:
+// env exports → path exports → raw body.
+func expandBlock(fm *frontmatter, rawBody string) string {
+	hasEnv := len(fm.Env) > 0
+	hasPaths := len(fm.Paths) > 0
+
+	// If no frontmatter fields, return body as-is
+	if !hasEnv && !hasPaths {
+		return rawBody
 	}
 
-	// Find closing ---
-	end := -1
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
-			end = i
+	var lines []string
+
+	// Env vars — sorted for deterministic output
+	for _, k := range slices.Sorted(maps.Keys(fm.Env)) {
+		lines = append(lines, fmt.Sprintf(`export %s="%s"`, k, fm.Env[k]))
+	}
+
+	// Paths — prepended in order
+	for _, p := range fm.Paths {
+		lines = append(lines, fmt.Sprintf(`export PATH="%s:$PATH"`, p))
+	}
+
+	// Raw body
+	if rawBody != "" {
+		lines = append(lines, rawBody)
+	}
+
+	if len(lines) == 0 {
+		return ""
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// splitBlocks splits content into multiple rawBlock structures.
+// Each frontmatter section is delimited by --- on its own line.
+// Content without leading --- is treated as a single body-only block.
+func splitBlocks(content string) ([]rawBlock, error) {
+	lines := strings.Split(content, "\n")
+
+	// If content doesn't start with ---, it's a body-only block
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		return []rawBlock{{Body: content}}, nil
+	}
+
+	var blocks []rawBlock
+	i := 0
+
+	for i < len(lines) {
+		// Find opening ---
+		if strings.TrimSpace(lines[i]) != "---" {
 			break
 		}
+		i++ // skip opening ---
+
+		// Find closing ---
+		fmStart := i
+		end := -1
+		for i < len(lines) {
+			if strings.TrimSpace(lines[i]) == "---" {
+				end = i
+				break
+			}
+			i++
+		}
+
+		if end == -1 {
+			return nil, fmt.Errorf("unterminated frontmatter (missing closing ---)")
+		}
+
+		fmContent := strings.Join(lines[fmStart:end], "\n")
+		i++ // skip closing ---
+
+		// Collect body until next --- or EOF
+		bodyStart := i
+		for i < len(lines) {
+			if strings.TrimSpace(lines[i]) == "---" {
+				break
+			}
+			i++
+		}
+
+		bodyContent := strings.Join(lines[bodyStart:i], "\n")
+		blocks = append(blocks, rawBlock{
+			Frontmatter: fmContent,
+			Body:        bodyContent,
+		})
 	}
 
-	if end == -1 {
-		return "", nil, fmt.Errorf("unterminated frontmatter (missing closing ---)")
-	}
-
-	frontmatterContent := strings.Join(lines[1:end], "\n")
-	bodyContent := strings.Join(lines[end+1:], "\n")
-
-	return bodyContent, &frontmatterContent, nil
+	return blocks, nil
 }

@@ -1,5 +1,7 @@
 ---
 phase: env
+env:
+  BUN_INSTALL: "${BUN_INSTALL:-$HOME/.bun}"
+paths:
+  - $BUN_INSTALL/bin
 ---
-export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-export PATH="$BUN_INSTALL/bin:$PATH"
