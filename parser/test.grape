@@ -1,0 +1,4 @@
+---
+phase: env
+---
+export EMBEDDED=1

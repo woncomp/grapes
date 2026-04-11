@@ -1,0 +1,12 @@
+---
+phase: env
+---
+export PATH="$HOME/.local/bin:$PATH"
+
+#ifdef BASH
+eval "$(uv generate-shell-completion bash)"
+#endif
+
+#ifdef ZSH
+eval "$(uv generate-shell-completion zsh)"
+#endif
