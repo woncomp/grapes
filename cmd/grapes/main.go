@@ -1,51 +1,136 @@
 package main
 
 import (
-	"flag"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/woncomp/grapes/fragments"
-	"github.com/woncomp/grapes/lazy"
 	"github.com/woncomp/grapes/parser"
 	"github.com/woncomp/grapes/preprocessor"
 	"github.com/woncomp/grapes/resolver"
+	"github.com/woncomp/grapes/shells"
 	"github.com/woncomp/grapes/writer"
 )
 
+var (
+	errHelpRequested = errors.New("help requested")
+	outputPhases     = []string{shells.PhaseEnv, shells.PhaseMain}
+)
+
+type cliOptions struct {
+	masterPath string
+	targets    []shells.Shell
+	noLink     bool
+}
+
 func main() {
-	lazyFlag := flag.Bool("lazy", false, "also install source lines in system rc files")
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: grapes <source.grapes> [--lazy]\n\n")
-		fmt.Fprintf(os.Stderr, "Generate shell rc files from .grape fragments.\n\n")
-		flag.PrintDefaults()
-	}
-
-	// Scan for --lazy in args before flag.Parse, since Go's flag package
-	// stops parsing at the first non-flag argument.
-	for _, arg := range os.Args[1:] {
-		if arg == "--lazy" {
-			*lazyFlag = true
+	opts, err := parseArgs(os.Args[1:], os.LookupEnv)
+	if err != nil {
+		if errors.Is(err, errHelpRequested) {
+			printUsage(os.Stdout)
+			return
 		}
-	}
 
-	flag.Parse()
-
-	if flag.NArg() < 1 {
-		flag.Usage()
+		printUsage(os.Stderr)
+		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
 		os.Exit(1)
 	}
 
-	masterPath := flag.Arg(0)
-	if err := run(masterPath, *lazyFlag); err != nil {
+	if err := run(opts.masterPath, opts.targets, opts.noLink); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(masterPath string, doLazy bool) error {
-	// 1. Parse master file
+func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions, error) {
+	var opts cliOptions
+	seenTargets := make(map[string]bool)
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		switch {
+		case arg == "-h" || arg == "--help":
+			return cliOptions{}, errHelpRequested
+		case arg == "--nolink":
+			opts.noLink = true
+		case arg == "-t" || arg == "--target":
+			if i+1 >= len(args) {
+				return cliOptions{}, fmt.Errorf("missing value for %s", arg)
+			}
+			i++
+			if err := addTarget(&opts.targets, seenTargets, args[i]); err != nil {
+				return cliOptions{}, err
+			}
+		case strings.HasPrefix(arg, "-t="):
+			if err := addTarget(&opts.targets, seenTargets, strings.TrimPrefix(arg, "-t=")); err != nil {
+				return cliOptions{}, err
+			}
+		case strings.HasPrefix(arg, "--target="):
+			if err := addTarget(&opts.targets, seenTargets, strings.TrimPrefix(arg, "--target=")); err != nil {
+				return cliOptions{}, err
+			}
+		case strings.HasPrefix(arg, "-"):
+			return cliOptions{}, fmt.Errorf("unknown flag: %s", arg)
+		default:
+			if opts.masterPath != "" {
+				return cliOptions{}, fmt.Errorf("unexpected extra argument: %s", arg)
+			}
+			opts.masterPath = arg
+		}
+	}
+
+	if opts.masterPath == "" {
+		return cliOptions{}, fmt.Errorf("missing input file")
+	}
+
+	if len(opts.targets) == 0 {
+		target, err := shells.DetectCurrent(lookupEnv)
+		if err != nil {
+			return cliOptions{}, err
+		}
+		opts.targets = []shells.Shell{target}
+	}
+
+	return opts, nil
+}
+
+func addTarget(targets *[]shells.Shell, seen map[string]bool, raw string) error {
+	target, err := shells.Parse(raw)
+	if err != nil {
+		return err
+	}
+
+	if seen[target.Name()] {
+		return nil
+	}
+
+	seen[target.Name()] = true
+	*targets = append(*targets, target)
+	return nil
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--nolink]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Generate shell rc files from .grape fragments.")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  -t, --target shell   Target shell to generate and link (repeatable; default: current shell)")
+	fmt.Fprintln(w, "      --nolink         Generate managed rc files only; do not link user rc files")
+	fmt.Fprintln(w, "  -h, --help           Show help")
+}
+
+func run(masterPath string, targets []shells.Shell, noLink bool) error {
+	home := os.Getenv("HOME")
+	if home == "" {
+		return fmt.Errorf("HOME environment variable not set")
+	}
+
 	master, err := parser.ParseFile(masterPath)
 	if err != nil {
 		return err
@@ -59,47 +144,41 @@ func run(masterPath string, doLazy bool) error {
 		return fmt.Errorf("master file has no imports")
 	}
 
-	// 2. Parse all fragments in the same directory
 	fragDir := filepath.Dir(masterPath)
-	fragments, err := parseAllFragments(fragDir, master.Imports)
+	frags, err := parseAllFragments(fragDir, master.Imports)
 	if err != nil {
 		return err
 	}
 
-	// 3. Resolve dependencies
-	sorted, err := resolver.Resolve(master.Imports, fragments)
+	sorted, err := resolver.Resolve(master.Imports, frags)
 	if err != nil {
 		return err
 	}
 
-	// 4. Preprocess per shell and write output
-	outputDir := filepath.Join(os.Getenv("HOME"), ".config", "grapes")
-	shells := []string{"bash", "zsh"}
-	phases := []string{"env", "main"}
+	outputDir := filepath.Join(home, ".config", "grapes")
 
-	var outputs []writer.ShellOutput
-	for _, shell := range shells {
-		for _, phase := range phases {
-			var frags []writer.Fragment
+	var outputs []writer.OutputFile
+	for _, target := range targets {
+		for _, phase := range outputPhases {
+			var shellFragments []writer.Fragment
 			for _, f := range sorted {
 				for _, block := range f.Blocks {
 					if block.Phase != phase {
 						continue
 					}
-					content, err := preprocessor.Process(block.Body, shell)
+					content, err := preprocessor.Process(block.Body, target.Name())
 					if err != nil {
-						return fmt.Errorf("preprocessing %s for %s: %w", f.Name, shell, err)
+						return fmt.Errorf("preprocessing %s for %s: %w", f.Name, target.Name(), err)
 					}
-					frags = append(frags, writer.Fragment{
+					shellFragments = append(shellFragments, writer.Fragment{
 						Name:    f.Name,
 						Content: content,
 					})
 				}
 			}
-			outputs = append(outputs, writer.ShellOutput{
-				Shell:     shell,
-				Phase:     phase,
-				Fragments: frags,
+			outputs = append(outputs, writer.OutputFile{
+				Filename:  target.ManagedFilename(phase),
+				Fragments: shellFragments,
 			})
 		}
 	}
@@ -108,28 +187,54 @@ func run(masterPath string, doLazy bool) error {
 		return err
 	}
 
-	fmt.Printf("Generated rc files in %s\n", outputDir)
+	if err := pruneManagedOutputs(outputDir, targets); err != nil {
+		return err
+	}
 
-	// 5. Lazy install
-	if doLazy {
-		home := os.Getenv("HOME")
-		if home == "" {
-			return fmt.Errorf("HOME environment variable not set")
-		}
+	fmt.Printf("Generated rc files in %s for %s\n", outputDir, joinTargetNames(targets))
 
-		bashEnvTarget := lazy.DetectBashEnvTarget(home)
-		installMap := map[string]string{
-			bashEnvTarget:                  filepath.Join(outputDir, "bashenv"),
-			filepath.Join(home, ".bashrc"): filepath.Join(outputDir, "bashrc"),
-			filepath.Join(home, ".zshenv"): filepath.Join(outputDir, "zshenv"),
-			filepath.Join(home, ".zshrc"):  filepath.Join(outputDir, "zshrc"),
-		}
+	if noLink {
+		return nil
+	}
 
-		for rcFile, sourcePath := range installMap {
-			if err := lazy.Install(rcFile, sourcePath); err != nil {
-				return fmt.Errorf("installing source in %s: %w", rcFile, err)
+	for _, target := range targets {
+		for _, link := range target.LinkTargets(home, outputDir) {
+			if err := shells.Install(link.RCFile, link.SourcePath); err != nil {
+				return fmt.Errorf("installing source in %s: %w", link.RCFile, err)
 			}
-			fmt.Printf("Installed source in %s\n", rcFile)
+			fmt.Printf("Installed source in %s\n", link.RCFile)
+		}
+	}
+
+	return nil
+}
+
+func joinTargetNames(targets []shells.Shell) string {
+	names := make([]string, 0, len(targets))
+	for _, target := range targets {
+		names = append(names, target.Name())
+	}
+	return strings.Join(names, ", ")
+}
+
+func pruneManagedOutputs(outputDir string, selectedTargets []shells.Shell) error {
+	selected := make(map[string]bool)
+	for _, target := range selectedTargets {
+		for _, phase := range outputPhases {
+			selected[target.ManagedFilename(phase)] = true
+		}
+	}
+
+	for _, target := range shells.Supported() {
+		for _, phase := range outputPhases {
+			filename := target.ManagedFilename(phase)
+			if selected[filename] {
+				continue
+			}
+			path := filepath.Join(outputDir, filename)
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("removing stale managed output %s: %w", path, err)
+			}
 		}
 	}
 

@@ -10,7 +10,7 @@ Prefer `go run` so day-to-day testing does not leave build artifacts in the repo
 
 ```bash
 go run ./cmd/grapes <source.grapes>
-go run ./cmd/grapes <source.grapes> --lazy
+go run ./cmd/grapes <source.grapes> -t zsh
 ```
 
 ### Local executable builds

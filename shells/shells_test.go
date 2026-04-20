@@ -1,4 +1,4 @@
-package lazy
+package shells
 
 import (
 	"os"
@@ -7,6 +7,60 @@ import (
 	"testing"
 )
 
+func TestSupportedNames(t *testing.T) {
+	names := SupportedNames()
+	if got, want := strings.Join(names, ","), "bash,zsh"; got != want {
+		t.Fatalf("SupportedNames() = %q, want %q", got, want)
+	}
+}
+
+func TestParse(t *testing.T) {
+	shell, err := Parse("ZSH")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := shell.Name(), "zsh"; got != want {
+		t.Fatalf("Parse(ZSH).Name() = %q, want %q", got, want)
+	}
+}
+
+func TestParseUnsupported(t *testing.T) {
+	_, err := Parse("fish")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `unsupported target "fish"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDetectCurrent(t *testing.T) {
+	shell, err := DetectCurrent(func(key string) (string, bool) {
+		if key == "SHELL" {
+			return "/bin/zsh", true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := shell.Name(), "zsh"; got != want {
+		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
+	}
+}
+
+func TestDetectCurrentFailsWithoutShell(t *testing.T) {
+	_, err := DetectCurrent(func(string) (string, bool) {
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "could not detect current shell") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestInstallFresh(t *testing.T) {
 	dir := t.TempDir()
 	rcFile := filepath.Join(dir, ".bashrc")
@@ -14,8 +68,7 @@ func TestInstallFresh(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Install(rcFile, "$HOME/.config/grapes/bashrc")
-	if err != nil {
+	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,15 +96,12 @@ func TestInstallUpdate(t *testing.T) {
 	dir := t.TempDir()
 	rcFile := filepath.Join(dir, ".bashrc")
 
-	// First install
 	if err := os.WriteFile(rcFile, []byte("# existing\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
 		t.Fatal(err)
 	}
-
-	// Second install with different path
 	if err := Install(rcFile, "$HOME/.config/grapes/new-bashrc"); err != nil {
 		t.Fatal(err)
 	}
@@ -77,8 +127,7 @@ func TestInstallEmptyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Install(rcFile, "$HOME/.config/grapes/bashrc")
-	if err != nil {
+	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,15 +143,13 @@ func TestInstallEmptyFile(t *testing.T) {
 func TestUninstall(t *testing.T) {
 	dir := t.TempDir()
 	rcFile := filepath.Join(dir, ".bashrc")
-	original := "# existing content\n"
-	if err := os.WriteFile(rcFile, []byte(original), 0o644); err != nil {
+	if err := os.WriteFile(rcFile, []byte("# existing content\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
 		t.Fatal(err)
 	}
-
 	if err := Uninstall(rcFile); err != nil {
 		t.Fatal(err)
 	}
@@ -126,28 +173,8 @@ func TestUninstall(t *testing.T) {
 
 func TestUninstallNonExistent(t *testing.T) {
 	dir := t.TempDir()
-	rcFile := filepath.Join(dir, ".bashrc") // never created
+	rcFile := filepath.Join(dir, ".bashrc")
 	if err := Uninstall(rcFile); err != nil {
-		t.Fatal(err) // should return nil for non-existent file
-	}
-}
-
-func TestDetectBashProfile(t *testing.T) {
-	dir := t.TempDir()
-
-	// No files exist — should default to .bashenv
-	target := DetectBashEnvTarget(dir)
-	if !strings.HasSuffix(target, ".bashenv") {
-		t.Errorf("expected .bashenv fallback, got %s", target)
-	}
-
-	// Create .bash_profile — should use that
-	profile := filepath.Join(dir, ".bash_profile")
-	if err := os.WriteFile(profile, []byte(""), 0o644); err != nil {
 		t.Fatal(err)
-	}
-	target = DetectBashEnvTarget(dir)
-	if !strings.HasSuffix(target, ".bash_profile") {
-		t.Errorf("expected .bash_profile, got %s", target)
 	}
 }

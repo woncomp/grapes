@@ -10,23 +10,22 @@ import (
 func TestWriteBasic(t *testing.T) {
 	dir := t.TempDir()
 
-	bashFragments := []Fragment{
+	fragments := []Fragment{
 		{Name: "path", Content: "export PATH=/bin\n"},
 		{Name: "prompt", Content: "PS1='$ '\n"},
 	}
 
-	outputs := []ShellOutput{
-		{Shell: "bash", Phase: "env", Fragments: bashFragments[:1]},
-		{Shell: "bash", Phase: "main", Fragments: bashFragments[1:]},
-		{Shell: "zsh", Phase: "env", Fragments: bashFragments[:1]},
-		{Shell: "zsh", Phase: "main", Fragments: bashFragments[1:]},
+	outputs := []OutputFile{
+		{Filename: "bashenv", Fragments: fragments[:1]},
+		{Filename: "bashrc", Fragments: fragments[1:]},
+		{Filename: "zshenv", Fragments: fragments[:1]},
+		{Filename: "zshrc", Fragments: fragments[1:]},
 	}
 
 	if err := Write(dir, outputs); err != nil {
 		t.Fatal(err)
 	}
 
-	// Check bashenv
 	data, err := os.ReadFile(filepath.Join(dir, "bashenv"))
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +34,6 @@ func TestWriteBasic(t *testing.T) {
 		t.Errorf("bashenv missing path content: %q", string(data))
 	}
 
-	// Check bashrc
 	data, err = os.ReadFile(filepath.Join(dir, "bashrc"))
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +42,6 @@ func TestWriteBasic(t *testing.T) {
 		t.Errorf("bashrc missing prompt content: %q", string(data))
 	}
 
-	// Check zshenv
 	data, err = os.ReadFile(filepath.Join(dir, "zshenv"))
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +50,6 @@ func TestWriteBasic(t *testing.T) {
 		t.Errorf("zshenv missing path content: %q", string(data))
 	}
 
-	// Check zshrc
 	data, err = os.ReadFile(filepath.Join(dir, "zshrc"))
 	if err != nil {
 		t.Fatal(err)
@@ -67,8 +63,8 @@ func TestWriteCreatesDirectory(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "subdir", "grapes")
 
-	outputs := []ShellOutput{
-		{Shell: "bash", Phase: "main", Fragments: nil},
+	outputs := []OutputFile{
+		{Filename: "bashrc"},
 	}
 
 	if err := Write(target, outputs); err != nil {
@@ -83,16 +79,15 @@ func TestWriteCreatesDirectory(t *testing.T) {
 func TestWriteEmptyPhase(t *testing.T) {
 	dir := t.TempDir()
 
-	outputs := []ShellOutput{
-		{Shell: "bash", Phase: "env", Fragments: nil},
-		{Shell: "bash", Phase: "main", Fragments: []Fragment{{Name: "test", Content: "echo hi\n"}}},
+	outputs := []OutputFile{
+		{Filename: "bashenv"},
+		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "echo hi\n"}}},
 	}
 
 	if err := Write(dir, outputs); err != nil {
 		t.Fatal(err)
 	}
 
-	// bashenv should exist but be empty
 	data, err := os.ReadFile(filepath.Join(dir, "bashenv"))
 	if err != nil {
 		t.Fatal(err)
@@ -103,9 +98,8 @@ func TestWriteEmptyPhase(t *testing.T) {
 }
 
 func TestWriteMkdirAllError(t *testing.T) {
-	// /dev/null is not a directory, so MkdirAll("/dev/null/sub") should fail
-	outputs := []ShellOutput{
-		{Shell: "bash", Phase: "main", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
+	outputs := []OutputFile{
+		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
 	}
 	err := Write("/dev/null/subdir", outputs)
 	if err == nil {
@@ -115,16 +109,14 @@ func TestWriteMkdirAllError(t *testing.T) {
 
 func TestWriteFileError(t *testing.T) {
 	dir := t.TempDir()
-	// Create a file where the output directory should be
 	blockFile := filepath.Join(dir, "output")
 	if err := os.WriteFile(blockFile, []byte(""), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	outputs := []ShellOutput{
-		{Shell: "bash", Phase: "main", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
+	outputs := []OutputFile{
+		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
 	}
-	// MkdirAll on a path where a regular file blocks directory creation
 	err := Write(filepath.Join(blockFile, "sub"), outputs)
 	if err == nil {
 		t.Error("expected error when writing to blocked path")
