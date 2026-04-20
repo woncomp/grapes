@@ -1,76 +1,59 @@
-# Grapes: Shell RC File Generator Design Spec
+# Grapes: Current Shell RC Generator Design Spec
 
 ## Overview
 
-Grapes is a CLI tool that generates shell rc files from composable fragments (`.grape` files). Users write shell-agnostic configuration with optional shell-specific overrides, declare dependencies between fragments, and the tool generates properly-ordered rc files for multiple shells.
+Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.grapes` file, Grapes loads the referenced `.grape` fragments, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.config/grapes/`, and optionally links the user's rc files back to those managed outputs.
 
-**Core value:** Define once, generate for bash and zsh. Phase 1 scope.
+The current implementation targets `bash` and `zsh`. A run can generate one or more selected shells, defaults to the current shell when no target is specified, and can source either local fragments or built-in embedded fragments.
 
-## File Format
+## File Model
 
 There are two file types:
 
-- **`.grape`** — fragment files containing shell configuration with optional dependencies
-- **`.grapes`** — master files that list which fragments to include (entry point for generation)
+- **`.grape`** — reusable fragment files.
+- **`.grapes`** — master files that declare the fragment import list and act as the CLI entry point.
 
-Both share the same YAML frontmatter + C-style preprocessor body format. They may diverge in the future.
+Fragments are **multi-block** documents. Each block has optional YAML frontmatter and an associated body. A file without leading frontmatter is treated as a single `main` block.
 
-### Frontmatter
-
-```yaml
----
-deps: []          # list of fragment names this fragment depends on
-phase: main       # "env" or "main" (default: "main")
-imports: []       # master rcf only — fragments to include
----
-```
-
-- `deps`: array of strings — fragment names (filename without `.grape` extension) that must be processed before this one
-- `phase`: determines which output file the fragment contributes to:
-  - `env` → `{shell}env` (e.g., `bashenv`, `zshenv`)
-  - `main` → `{shell}rc` (e.g., `bashrc`, `zshrc`)
-- `imports`: only meaningful in the master `.grapes` file — the list of fragments to include in generation
-
-### Body
-
-Shell content with C-style preprocessor directives:
-
-- `#ifdef BASH` / `#ifdef ZSH` — include only for that shell
-- `#ifndef BASH` / `#ifndef ZSH` — exclude for that shell
-- `#elif` — else-if branch
-- `#else` — else branch
-- `#endif` — close conditional block
-
-Content outside directives is shell-agnostic and emitted for all target shells.
-
-### Example: `path.grape`
+### Block frontmatter
 
 ```yaml
 ---
-deps: []
-phase: env
+deps: []          # first block only
+imports: []       # master files only; first block only
+phase: main       # env or main, default: main
+env: {}           # environment variables to export before the body
+paths: []         # PATH entries to prepend before the body
 ---
-export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
-
-#ifdef BASH
-export BASH_COMPLETION_DIR="/etc/bash_completion.d"
-#endif
-
-#ifdef ZSH
-fpath=(/usr/local/share/zsh-completions $fpath)
-#endif
 ```
 
-### Example: `completions.grape`
+Field behavior:
+
+- `deps` is only accepted on the first block of a fragment.
+- `imports` is only meaningful on the first block of a master `.grapes` file.
+- `phase` controls whether the block contributes to the managed `env` file or the managed `main rc` file.
+- `env` expands into sorted `export KEY="VALUE"` lines before the body.
+- `paths` expands into ordered `export PATH="<entry>:$PATH"` lines before the body.
+
+Subsequent blocks may change `phase`, `env`, `paths`, and `body`, but not `deps` or `imports`.
+
+### Example fragment
 
 ```yaml
 ---
 deps:
   - path
-phase: main
+phase: env
+env:
+  GOPATH: "${GOPATH:-$HOME/go}"
+paths:
+  - $GOPATH/bin
 ---
+
+---
+phase: main
 #ifdef BASH
-source /etc/bash_completion
+complete -C some-tool some-tool
 #endif
 
 #ifdef ZSH
@@ -78,67 +61,152 @@ autoload -Uz compinit && compinit
 #endif
 ```
 
-### Example: `master.grapes`
+### Example master file
 
 ```yaml
 ---
 imports:
-  - path
+  - go
   - prompt
   - aliases
-  - completions
 ---
 ```
 
-## Architecture
+## Fragment Sources
 
-```
-master.grapes ──▶ Parser (per-file) ──▶ Dependency Resolver (topo sort)
-                                              │
-                                     ordered fragments
-                                              │
-                                              ▼
-                                     Preprocessor (per-shell)
-                                              │
-                              ┌───────────────┼───────────────┐
-                              ▼               ▼               ▼
-                         ~/.config/grapes/
-                         ├── bashenv    ├── bashrc    ├── zshenv
-                         └── zshrc
+When Grapes resolves imports and dependencies, it loads fragments in this order:
+
+1. A local `<name>.grape` file next to the master file.
+2. A built-in embedded fragment from `fragments/*.grape` if no local file exists.
+
+The repository currently embeds these curated fragments:
+
+- `go`
+- `nvm`
+- `uv`
+- `bun`
+- `zoxide`
+- `fzf`
+
+This gives local projects an override path while still shipping useful defaults.
+
+## Processing Pipeline
+
+```text
+master.grapes
+  -> parser.ParseFile
+  -> recursive fragment discovery (local first, embedded fallback)
+  -> resolver.Resolve
+  -> preprocessor.Process per selected shell and block
+  -> writer.Write managed files into ~/.config/grapes/
+  -> shells.Install link blocks unless --nolink
 ```
 
 ### Components
 
-1. **Parser** — reads `.grape` and `.grapes` files, splits YAML frontmatter from body, parses frontmatter into a struct, returns raw body with directive markers
-2. **Dependency Resolver** — builds a directed graph from fragment `deps`, topologically sorts using Kahn's algorithm, detects cycles and reports with the cycle path
-3. **Preprocessor** — walks sorted fragments, evaluates `#ifdef/#ifndef/#elif/#else/#endif` directives per target shell, emits resolved shell content
-4. **File Writer** — groups output by phase and shell, writes to `~/.config/grapes/`
-5. **Lazy Installer** — (with `--lazy`) appends/removes source marker blocks in user's system rc files
+1. **CLI (`cmd/grapes`)**
+   - Parses arguments.
+   - Detects the current shell from `$SHELL` when `-t/--target` is omitted.
+   - Requires a `.grapes` master file.
+   - Orchestrates parsing, resolution, preprocessing, writing, and optional linking.
 
-### Dependency Resolution
+2. **Parser (`parser`)**
+   - Parses `.grape` and `.grapes` files into `Fragment` values.
+   - Supports multi-block documents.
+   - Validates `phase` values and enforces first-block-only rules for `deps` and `imports`.
+   - Expands first-class `env` and `paths` fields into shell code before preprocessing.
 
-- Dependencies are transitive (A depends on B, B depends on C → C before B before A)
-- Fragments with no deps maintain stable insertion order
-- Cycles produce an error with the full cycle path: `circular dependency: a -> b -> a`
-- Fragments not reachable from the master's `imports` are not processed
+3. **Dependency resolver (`resolver`)**
+   - Traverses imports plus transitive dependencies.
+   - Produces a deterministic topological order.
+   - Reports missing fragments and circular dependency paths.
+
+4. **Preprocessor (`preprocessor`)**
+   - Evaluates `#ifdef`, `#ifndef`, `#elif`, `#else`, and `#endif` directives.
+   - Rejects unknown `#...` directives.
+   - Injects `export __GRAPES_SHELL="<shell>"` at the top of each processed block.
+
+5. **Writer (`writer`)**
+   - Writes selected output files into `~/.config/grapes/`.
+   - Concatenates preprocessed fragment output in resolved order.
+
+6. **Shell integration (`shells`)**
+   - Models supported shells and their managed filenames.
+   - Installs and removes marker-based source blocks in user rc files.
+   - Decides shell-specific link targets, including bash's `.bash_profile` vs `.bashenv` behavior.
+
+## Dependency Resolution Rules
+
+- Dependencies are transitive.
+- Only fragments reachable from the master's `imports` are processed.
+- Missing fragments fail the run with an error.
+- Cycles fail the run with a readable path such as `circular dependency: a -> b -> a`.
+- Ordering is deterministic. Independent fragments and same-level edges are processed in lexicographic name order.
+
+## Preprocessor Rules
+
+Supported directives:
+
+- `#ifdef BASH`
+- `#ifdef ZSH`
+- `#ifndef BASH`
+- `#ifndef ZSH`
+- `#elif <shell>`
+- `#else`
+- `#endif`
+
+Content outside directives is emitted for all selected shells.
+
+Unknown `#...` lines are treated as invalid directives and produce an error with a line number.
 
 ## CLI Interface
 
 ### Basic usage
 
-```
-grapes <source.grapes>
-```
-
-Reads the master `.grapes`, parses all imported fragments, resolves dependencies, preprocesses for bash and zsh, writes output to `~/.config/grapes/`.
-
-### With `--lazy`
-
-```
-grapes <source.grapes> --lazy
+```bash
+go run ./cmd/grapes <source.grapes>
 ```
 
-Everything above, plus appends source lines to system rc files using marker blocks:
+### Explicit targets
+
+```bash
+go run ./cmd/grapes <source.grapes> -t zsh --target=bash
+```
+
+### Generate without linking rc files
+
+```bash
+go run ./cmd/grapes <source.grapes> --nolink
+```
+
+Behavior:
+
+- `-t, --target` is repeatable.
+- When no target is provided, Grapes detects the current shell from `$SHELL`.
+- Managed outputs are always written to `~/.config/grapes/`.
+- Link blocks are installed by default; `--nolink` skips rc file modification.
+- Managed outputs for supported shells that were not selected in the current run are pruned.
+
+## Managed Output Structure
+
+For selected shells, Grapes writes:
+
+```text
+~/.config/grapes/
+├── bashenv
+├── bashrc
+├── zshenv
+└── zshrc
+```
+
+Phase mapping:
+
+- `env` -> `<shell>env`
+- `main` -> `<shell>rc`
+
+## Link Installation
+
+Installed marker block:
 
 ```bash
 # >>> grapes >>>
@@ -146,39 +214,48 @@ source "$HOME/.config/grapes/bashrc"
 # <<< grapes <<<
 ```
 
-Source targets:
-- `~/.bashenv` or `~/.bash_profile` ← `bashenv` (auto-detect: prefer `~/.bash_profile` if it exists, otherwise `~/.bashenv`)
-- `~/.bashrc` ← `bashrc`
-- `~/.zshenv` ← `zshenv`
-- `~/.zshrc` ← `zshrc`
+Link targets:
 
-The marker block allows subsequent runs to update or remove source lines cleanly.
+- `bashenv` -> `~/.bash_profile` if it exists, otherwise `~/.bashenv`
+- `bashrc` -> `~/.bashrc`
+- `zshenv` -> `~/.zshenv`
+- `zshrc` -> `~/.zshrc`
 
-### Repository layout
-
-The CLI entry point lives under `cmd/grapes/main.go`, following the common Go convention of keeping executable entry points in `cmd/` and reusable packages at the module root.
-
-## Output Structure
-
-```
-~/.config/grapes/
-├── bashenv    # fragments with phase: env, preprocessed for bash
-├── bashrc     # fragments with phase: main, preprocessed for bash
-├── zshenv     # fragments with phase: env, preprocessed for zsh
-└── zshrc      # fragments with phase: main, preprocessed for zsh
-```
+Existing Grapes marker blocks are replaced in place so repeated runs stay idempotent.
 
 ## Error Handling
 
-- Missing fragment file: error with the expected path
-- Circular dependency: error with full cycle path
-- Unknown directive: error with file and line number
-- Invalid YAML frontmatter: error with file and parse details
-- Unknown phase value: error (valid: `env`, `main`)
+The current implementation surfaces explicit errors for:
 
-## Technology
+- missing input file
+- non-master input passed to the CLI
+- master file with no imports
+- missing fragment dependencies
+- circular dependencies
+- invalid YAML frontmatter
+- invalid `phase` values
+- malformed or unmatched preprocessor directives
+- unsupported shell targets
+- inability to detect the current shell from `$SHELL`
+- missing `HOME`
 
-- Language: Go (matches existing project)
-- YAML parsing: `gopkg.in/yaml.v3`
-- CLI: standard library `flag` or `os.Args` (minimal CLI, no need for cobra for v1)
-- No external dependencies beyond YAML parser
+## Repository Layout
+
+```text
+cmd/grapes/       CLI entry point and orchestration
+parser/           multi-block fragment parsing
+resolver/         dependency ordering and cycle detection
+preprocessor/     shell directive evaluation
+writer/           managed file output
+shells/           shell metadata and rc-file linking
+fragments/        embedded built-in `.grape` fragments
+docs/superpowers/ design spec and as-built plan
+```
+
+## Validation
+
+The repository validates this behavior with package-level Go tests across the CLI, parser, resolver, preprocessor, writer, shell integration, and embedded fragments:
+
+```bash
+go test ./...
+```
