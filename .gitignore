@@ -33,3 +33,8 @@ go.work.sum
 
 # Git worktrees
 .worktrees/
+
+# Project build artifacts
+/grapes
+/bin/
+/dist/

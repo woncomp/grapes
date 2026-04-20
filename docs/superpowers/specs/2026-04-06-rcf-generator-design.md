@@ -154,6 +154,10 @@ Source targets:
 
 The marker block allows subsequent runs to update or remove source lines cleanly.
 
+### Repository layout
+
+The CLI entry point lives under `cmd/grapes/main.go`, following the common Go convention of keeping executable entry points in `cmd/` and reusable packages at the module root.
+
 ## Output Structure
 
 ```

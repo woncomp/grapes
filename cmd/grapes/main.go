@@ -119,10 +119,10 @@ func run(masterPath string, doLazy bool) error {
 
 		bashEnvTarget := lazy.DetectBashEnvTarget(home)
 		installMap := map[string]string{
-			bashEnvTarget:                     filepath.Join(outputDir, "bashenv"),
-			filepath.Join(home, ".bashrc"):    filepath.Join(outputDir, "bashrc"),
-			filepath.Join(home, ".zshenv"):    filepath.Join(outputDir, "zshenv"),
-			filepath.Join(home, ".zshrc"):     filepath.Join(outputDir, "zshrc"),
+			bashEnvTarget:                  filepath.Join(outputDir, "bashenv"),
+			filepath.Join(home, ".bashrc"): filepath.Join(outputDir, "bashrc"),
+			filepath.Join(home, ".zshenv"): filepath.Join(outputDir, "zshenv"),
+			filepath.Join(home, ".zshrc"):  filepath.Join(outputDir, "zshrc"),
 		}
 
 		for rcFile, sourcePath := range installMap {
