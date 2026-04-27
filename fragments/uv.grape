@@ -1,5 +1,10 @@
 ---
 phase: env
+depend_executable:
+  binary: uv
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
 #ifdef BASH
 export PATH="$HOME/.local/bin:$PATH"

@@ -299,18 +299,15 @@ body2
 
 func TestParseGrapeFileDependExecutable(t *testing.T) {
 	dir := t.TempDir()
-	path := writeTempFile(t, dir, "zoxide.grape", `---
-phase: main
+	path := writeTempFile(t, dir, "bun.grape", `---
+phase: env
 depend_executable:
-  binary: zoxide
-  search_paths:
-    - ~/.local/bin
-    - $HOME/.cargo/bin
+  binary: bun
   version_args:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-eval "$(zoxide init zsh)"
+echo bun
 `)
 
 	grape, err := ParseGrapeFile(path)
@@ -320,11 +317,11 @@ eval "$(zoxide init zsh)"
 	if grape.DependExecutable == nil {
 		t.Fatal("DependExecutable = nil, want config")
 	}
-	if got, want := grape.DependExecutable.Binary, "zoxide"; got != want {
+	if got, want := grape.DependExecutable.Binary, "bun"; got != want {
 		t.Fatalf("Binary = %q, want %q", got, want)
 	}
-	if got, want := grape.DependExecutable.SearchPaths[0], "~/.local/bin"; got != want {
-		t.Fatalf("SearchPaths[0] = %q, want %q", got, want)
+	if got, want := len(grape.DependExecutable.SearchPaths), 0; got != want {
+		t.Fatalf("len(SearchPaths) = %d, want %d", got, want)
 	}
 	if got, want := grape.DependExecutable.VersionArgs[0], "--version"; got != want {
 		t.Fatalf("VersionArgs[0] = %q, want %q", got, want)

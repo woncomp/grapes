@@ -342,7 +342,12 @@ func TestRunNoLinkBuiltinsAvoidPosixSyntaxForNushell(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
+	binDir := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	createExecutable(t, binDir, "go", "echo go version go1.24.1 linux/amd64")
+	createExecutable(t, binDir, "bun", "echo 1.2.0")
+	createExecutable(t, binDir, "uv", "echo uv 0.7.2")
 	if runtime.GOOS == "windows" {
 		appData = t.TempDir()
 		t.Setenv("APPDATA", appData)
@@ -396,7 +401,13 @@ func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPowerShell(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
+	binDir := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	createExecutable(t, binDir, "go", "echo go version go1.24.1 linux/amd64")
+	createExecutable(t, binDir, "bun", "echo 1.2.0")
+	createExecutable(t, binDir, "uv", "echo uv 0.7.2")
+	createExecutable(t, binDir, "zoxide", "echo zoxide 0.9.4")
 	if runtime.GOOS == "windows" {
 		appData = t.TempDir()
 		t.Setenv("APPDATA", appData)
