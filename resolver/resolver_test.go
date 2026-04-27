@@ -7,30 +7,30 @@ import (
 	"github.com/woncomp/grapes/parser"
 )
 
-func makeFrag(name string, deps ...string) *parser.Fragment {
-	return &parser.Fragment{
-		Name:  name,
-		Deps:  deps,
+func makeGrape(name string, deps ...string) *parser.GrapeFile {
+	return &parser.GrapeFile{
+		Name:   name,
+		Deps:   deps,
 		Blocks: []parser.Block{{Phase: "main"}},
 	}
 }
 
 func TestSimpleOrder(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("aliases"),
-		makeFrag("path"),
-		makeFrag("prompt"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("aliases"),
+		makeGrape("path"),
+		makeGrape("prompt"),
 	}
 	imports := []string{"aliases", "path", "prompt"}
 
-	sorted, err := Resolve(imports, fragments)
+	sorted, err := Resolve(imports, grapes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	names := namesOf(sorted)
 	if len(names) != 3 {
-		t.Fatalf("got %d fragments, want 3", len(names))
+		t.Fatalf("got %d grapes, want 3", len(names))
 	}
 	for _, want := range []string{"aliases", "path", "prompt"} {
 		if !contains(names, want) {
@@ -40,14 +40,14 @@ func TestSimpleOrder(t *testing.T) {
 }
 
 func TestDependencyOrder(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("completions", "path"),
-		makeFrag("path"),
-		makeFrag("prompt"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("completions", "path"),
+		makeGrape("path"),
+		makeGrape("prompt"),
 	}
 	imports := []string{"completions", "path", "prompt"}
 
-	sorted, err := Resolve(imports, fragments)
+	sorted, err := Resolve(imports, grapes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestDependencyOrder(t *testing.T) {
 	completionsIdx := indexOf(names, "completions")
 
 	if pathIdx == -1 || completionsIdx == -1 {
-		t.Fatal("missing expected fragments")
+		t.Fatal("missing expected grapes")
 	}
 	if pathIdx > completionsIdx {
 		t.Errorf("path (index %d) should come before completions (index %d)", pathIdx, completionsIdx)
@@ -65,14 +65,14 @@ func TestDependencyOrder(t *testing.T) {
 }
 
 func TestTransitiveDeps(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("completions", "path"),
-		makeFrag("path", "env"),
-		makeFrag("env"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("completions", "path"),
+		makeGrape("path", "env"),
+		makeGrape("env"),
 	}
 	imports := []string{"completions"}
 
-	sorted, err := Resolve(imports, fragments)
+	sorted, err := Resolve(imports, grapes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,13 +88,13 @@ func TestTransitiveDeps(t *testing.T) {
 }
 
 func TestCycleDetection(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("a", "b"),
-		makeFrag("b", "a"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("a", "b"),
+		makeGrape("b", "a"),
 	}
 	imports := []string{"a"}
 
-	_, err := Resolve(imports, fragments)
+	_, err := Resolve(imports, grapes)
 	if err == nil {
 		t.Fatal("expected cycle error, got nil")
 	}
@@ -104,14 +104,14 @@ func TestCycleDetection(t *testing.T) {
 }
 
 func TestThreeNodeCycle(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("a", "b"),
-		makeFrag("b", "c"),
-		makeFrag("c", "a"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("a", "b"),
+		makeGrape("b", "c"),
+		makeGrape("c", "a"),
 	}
 	imports := []string{"a"}
 
-	_, err := Resolve(imports, fragments)
+	_, err := Resolve(imports, grapes)
 	if err == nil {
 		t.Fatal("expected cycle error for 3-node cycle, got nil")
 	}
@@ -121,55 +121,53 @@ func TestThreeNodeCycle(t *testing.T) {
 }
 
 func TestCycleDetectionWithBacktracking(t *testing.T) {
-	// a -> x, a -> y, y -> y (self-cycle)
-	// DFS from a explores x first (no cycle), backtracks, then finds y -> y
-	fragments := []*parser.Fragment{
-		makeFrag("a", "x", "y"),
-		makeFrag("x"),
-		makeFrag("y", "y"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("a", "x", "y"),
+		makeGrape("x"),
+		makeGrape("y", "y"),
 	}
 	imports := []string{"a"}
 
-	_, err := Resolve(imports, fragments)
+	_, err := Resolve(imports, grapes)
 	if err == nil {
 		t.Fatal("expected cycle error with backtracking, got nil")
 	}
 }
 
 func TestMissingDependency(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("a", "nonexistent"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("a", "nonexistent"),
 	}
 	imports := []string{"a"}
 
-	_, err := Resolve(imports, fragments)
+	_, err := Resolve(imports, grapes)
 	if err == nil {
 		t.Fatal("expected error for missing dependency, got nil")
 	}
 }
 
 func TestUnreachableIgnored(t *testing.T) {
-	fragments := []*parser.Fragment{
-		makeFrag("used"),
-		makeFrag("unused"),
+	grapes := []*parser.GrapeFile{
+		makeGrape("used"),
+		makeGrape("unused"),
 	}
 	imports := []string{"used"}
 
-	sorted, err := Resolve(imports, fragments)
+	sorted, err := Resolve(imports, grapes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	names := namesOf(sorted)
 	if contains(names, "unused") {
-		t.Error("unreachable fragment 'unused' should not appear in result")
+		t.Error("unreachable grape 'unused' should not appear in result")
 	}
 }
 
-func namesOf(frags []*parser.Fragment) []string {
-	names := make([]string, len(frags))
-	for i, f := range frags {
-		names[i] = f.Name
+func namesOf(grapes []*parser.GrapeFile) []string {
+	names := make([]string, len(grapes))
+	for i, grape := range grapes {
+		names[i] = grape.Name
 	}
 	return names
 }

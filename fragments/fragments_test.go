@@ -27,9 +27,9 @@ func TestEmbeddedFragmentsValid(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			frag, err := parser.ParseString(name, string(data))
+			frag, err := parser.ParseGrapeString(name, string(data), "<embedded:"+name+">")
 			if err != nil {
-				t.Fatalf("ParseString failed: %v", err)
+				t.Fatalf("ParseGrapeString failed: %v", err)
 			}
 
 			if len(frag.Blocks) == 0 {

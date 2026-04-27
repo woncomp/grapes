@@ -200,26 +200,26 @@ func runWithOptions(opts runOptions) error {
 		return err
 	}
 
-	master, err := parser.ParseFile(opts.masterPath)
+	if filepath.Ext(opts.masterPath) != ".grapes" {
+		return fmt.Errorf("%s is not a .grapes file", opts.masterPath)
+	}
+
+	grapesFile, err := parser.ParseGrapesFile(opts.masterPath)
 	if err != nil {
 		return err
 	}
 
-	if !master.IsMaster {
-		return fmt.Errorf("%s is not a .grapes file", opts.masterPath)
-	}
-
-	if len(master.Imports) == 0 {
+	if len(grapesFile.Imports) == 0 {
 		return fmt.Errorf("master file has no imports")
 	}
 
 	fragDir := filepath.Dir(opts.masterPath)
-	frags, err := parseAllFragments(fragDir, master.Imports)
+	grapes, err := parseAllGrapes(fragDir, grapesFile.Imports)
 	if err != nil {
 		return err
 	}
 
-	sorted, err := resolver.Resolve(master.Imports, frags)
+	sorted, err := resolver.Resolve(grapesFile.Imports, grapes)
 	if err != nil {
 		return err
 	}
@@ -353,11 +353,11 @@ func pruneManagedOutputs(outputDir string, selectedTargets []shells.Shell) error
 	return nil
 }
 
-// parseAllFragments recursively discovers and parses all .grape files
+// parseAllGrapes recursively discovers and parses all .grape files
 // reachable from the given import list.
-func parseAllFragments(dir string, imports []string) ([]*parser.Fragment, error) {
+func parseAllGrapes(dir string, imports []string) ([]*parser.GrapeFile, error) {
 	seen := make(map[string]bool)
-	var frags []*parser.Fragment
+	var grapes []*parser.GrapeFile
 
 	var collect func(name string) error
 	collect = func(name string) error {
@@ -366,13 +366,13 @@ func parseAllFragments(dir string, imports []string) ([]*parser.Fragment, error)
 		}
 		seen[name] = true
 
-		frag, err := parser.ParseFileOrEmbedded(dir, name, fragments.FS)
+		grape, err := parser.ParseEmbeddedGrape(dir, name, fragments.FS)
 		if err != nil {
 			return err
 		}
-		frags = append(frags, frag)
+		grapes = append(grapes, grape)
 
-		for _, dep := range frag.Deps {
+		for _, dep := range grape.Deps {
 			if err := collect(dep); err != nil {
 				return err
 			}
@@ -386,5 +386,5 @@ func parseAllFragments(dir string, imports []string) ([]*parser.Fragment, error)
 		}
 	}
 
-	return frags, nil
+	return grapes, nil
 }
