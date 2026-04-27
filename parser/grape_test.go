@@ -10,8 +10,6 @@ import (
 func TestParseGrapeFile(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTempFile(t, dir, "tool.grape", `---
-deps:
-  - path
 phase: env
 env:
   TOOL_HOME: "$HOME/tool"
@@ -32,12 +30,6 @@ eval "$(tool init)"
 
 	if got, want := grape.Name, "tool"; got != want {
 		t.Fatalf("Name = %q, want %q", got, want)
-	}
-	if got, want := len(grape.Deps), 1; got != want {
-		t.Fatalf("len(Deps) = %d, want %d", got, want)
-	}
-	if got, want := grape.Deps[0], "path"; got != want {
-		t.Fatalf("Deps[0] = %q, want %q", got, want)
 	}
 	if got, want := len(grape.Blocks), 2; got != want {
 		t.Fatalf("len(Blocks) = %d, want %d", got, want)
@@ -79,7 +71,6 @@ func TestParseGrapeFileNoFrontmatter(t *testing.T) {
 func TestParseGrapeFileDefaultPhase(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTempFile(t, dir, "test.grape", `---
-deps: []
 ---
 some content
 `)
@@ -127,8 +118,7 @@ body
 func TestParseGrapeFileUnterminatedFrontmatter(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTempFile(t, dir, "bad.grape", `---
-deps:
-  - path
+phase: main
 `)
 
 	_, err := ParseGrapeFile(path)
@@ -146,8 +136,6 @@ func TestParseGrapeFileNonExistent(t *testing.T) {
 
 func TestParseGrapeString(t *testing.T) {
 	grape, err := ParseGrapeString("test", `---
-deps:
-  - path
 phase: env
 ---
 export FOO=bar
@@ -161,9 +149,6 @@ export FOO=bar
 	}
 	if got, want := grape.Blocks[0].Phase, "env"; got != want {
 		t.Fatalf("Phase = %q, want %q", got, want)
-	}
-	if got, want := grape.Deps[0], "path"; got != want {
-		t.Fatalf("Deps[0] = %q, want %q", got, want)
 	}
 	if !strings.HasPrefix(grape.Path, "<embedded:") {
 		t.Fatalf("Path = %q, want embedded path", grape.Path)
@@ -287,25 +272,6 @@ paths:
 	}
 }
 
-func TestParseGrapeStringDepsInSecondBlockError(t *testing.T) {
-	_, err := ParseGrapeString("bad", `---
-phase: env
----
-body
-
----
-deps: [foo]
----
-more body
-`, "<embedded:bad>")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "deps not allowed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestParseGrapeStringThreeBlocks(t *testing.T) {
 	grape, err := ParseGrapeString("test", `---
 phase: env
@@ -328,5 +294,123 @@ body2
 	}
 	if got, want := len(grape.Blocks), 3; got != want {
 		t.Fatalf("len(Blocks) = %d, want %d", got, want)
+	}
+}
+
+func TestParseGrapeFileDependExecutable(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "zoxide.grape", `---
+phase: main
+depend_executable:
+  binary: zoxide
+  search_paths:
+    - ~/.local/bin
+    - $HOME/.cargo/bin
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+eval "$(zoxide init zsh)"
+`)
+
+	grape, err := ParseGrapeFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if grape.DependExecutable == nil {
+		t.Fatal("DependExecutable = nil, want config")
+	}
+	if got, want := grape.DependExecutable.Binary, "zoxide"; got != want {
+		t.Fatalf("Binary = %q, want %q", got, want)
+	}
+	if got, want := grape.DependExecutable.SearchPaths[0], "~/.local/bin"; got != want {
+		t.Fatalf("SearchPaths[0] = %q, want %q", got, want)
+	}
+	if got, want := grape.DependExecutable.VersionArgs[0], "--version"; got != want {
+		t.Fatalf("VersionArgs[0] = %q, want %q", got, want)
+	}
+	if got, want := grape.DependExecutable.VersionRegex, "([0-9]+\\.[0-9]+\\.[0-9]+)"; got != want {
+		t.Fatalf("VersionRegex = %q, want %q", got, want)
+	}
+}
+
+func TestParseGrapeFileRejectsDeps(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "bad.grape", `---
+deps:
+  - path
+phase: main
+---
+echo bad
+`)
+
+	_, err := ParseGrapeFile(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "deps") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseGrapeFileRejectsDependExecutableWithoutBinary(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "bad.grape", `---
+phase: main
+depend_executable:
+  version_args:
+    - --version
+---
+echo bad
+`)
+
+	_, err := ParseGrapeFile(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "binary") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseGrapeFileRejectsDependExecutableInvalidRegex(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "bad.grape", `---
+phase: main
+depend_executable:
+  binary: zoxide
+  version_args:
+    - --version
+  version_regex: "("
+---
+echo bad
+`)
+
+	_, err := ParseGrapeFile(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "version_regex") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseGrapeFileRejectsDependExecutableRegexWithoutArgs(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "bad.grape", `---
+phase: main
+depend_executable:
+  binary: zoxide
+  version_regex: "([0-9]+)"
+---
+echo bad
+`)
+
+	_, err := ParseGrapeFile(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "version_args") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

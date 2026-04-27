@@ -25,7 +25,16 @@ type reviewUI struct {
 	interactive bool
 	color       bool
 	assumeYes   bool
+	reader      *bufio.Reader
 }
+
+type dependencyAction string
+
+const (
+	dependencyActionCancel        dependencyAction = "cancel"
+	dependencyActionSafe          dependencyAction = "safe"
+	dependencyActionAllowWarnings dependencyAction = "allow_warnings"
+)
 
 func previewShellLinkPlan(target shells.Shell, ctx shells.TargetContext) (shellLinkPlan, error) {
 	links, err := target.LinkTargets(ctx)
@@ -53,7 +62,7 @@ func (p shellLinkPlan) hasChanges() bool {
 	return false
 }
 
-func (ui reviewUI) reviewShell(plan shellLinkPlan) (bool, error) {
+func (ui *reviewUI) reviewShell(plan shellLinkPlan) (bool, error) {
 	stdout := ui.stdout
 	if stdout == nil {
 		stdout = io.Discard
@@ -83,7 +92,7 @@ func (ui reviewUI) reviewShell(plan shellLinkPlan) (bool, error) {
 		return false, fmt.Errorf("shell link review requires an interactive terminal; rerun with --yes to accept changes automatically or --nolink to skip linking")
 	}
 
-	reader := bufio.NewReader(ui.stdin)
+	reader := ui.getReader()
 	for {
 		fmt.Fprintf(stdout, "Apply changes for %s? [y/N]: ", plan.shell.Name())
 		answer, err := reader.ReadString('\n')
@@ -101,6 +110,66 @@ func (ui reviewUI) reviewShell(plan shellLinkPlan) (bool, error) {
 			return false, nil
 		}
 	}
+}
+
+func (ui *reviewUI) chooseDependencyAction(results []grapeDependencyResult) (dependencyAction, error) {
+	stdout := ui.stdout
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if ui.assumeYes {
+		return dependencyActionSafe, nil
+	}
+	if !ui.interactive {
+		return dependencyActionCancel, fmt.Errorf("dependency review requires an interactive terminal; rerun with --yes to continue without prompting")
+	}
+
+	hasWarnings := false
+	for _, result := range results {
+		if result.Status == dependencyStatusWarning {
+			hasWarnings = true
+			break
+		}
+	}
+
+	reader := ui.getReader()
+	for {
+		if hasWarnings {
+			fmt.Fprintln(stdout, "Dependency check options: [y] continue safely, [w] ignore warnings, [n] cancel")
+			fmt.Fprint(stdout, "Choose action [y/w/N]: ")
+		} else {
+			fmt.Fprint(stdout, "Continue with generation? [y/N]: ")
+		}
+		answer, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return dependencyActionCancel, err
+		}
+		switch strings.ToLower(strings.TrimSpace(answer)) {
+		case "y", "yes":
+			return dependencyActionSafe, nil
+		case "w":
+			if hasWarnings {
+				return dependencyActionAllowWarnings, nil
+			}
+		case "", "n", "no":
+			return dependencyActionCancel, nil
+		}
+		if hasWarnings {
+			fmt.Fprintln(stdout, "Please answer y, w, or n.")
+		} else {
+			fmt.Fprintln(stdout, "Please answer y or n.")
+		}
+		if err == io.EOF {
+			return dependencyActionCancel, nil
+		}
+	}
+}
+
+func (ui *reviewUI) getReader() *bufio.Reader {
+	if ui.reader == nil {
+		ui.reader = bufio.NewReader(ui.stdin)
+	}
+	return ui.reader
 }
 
 func colorizeDiff(diff string) string {

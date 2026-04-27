@@ -8,11 +8,18 @@ import (
 	"strings"
 )
 
+type DependExecutable struct {
+	Binary       string
+	SearchPaths  []string
+	VersionArgs  []string
+	VersionRegex string
+}
+
 type GrapeFile struct {
-	Name   string
-	Path   string
-	Deps   []string
-	Blocks []Block
+	Name             string
+	Path             string
+	DependExecutable *DependExecutable
+	Blocks           []Block
 }
 
 func ParseGrapeFile(path string) (*GrapeFile, error) {
@@ -37,11 +44,16 @@ func ParseGrapeString(name, content, path string) (*GrapeFile, error) {
 		if err != nil {
 			return nil, err
 		}
-		if i > 0 && len(parsed.Deps) > 0 {
-			return nil, fmt.Errorf("deps not allowed in block %d of %s (only first block)", i+1, path)
+		if len(parsed.Deps) > 0 {
+			return nil, fmt.Errorf("deps is not supported in %s", path)
 		}
-		if i == 0 {
-			grape.Deps = parsed.Deps
+		if i == 0 && parsed.DependExecutable != nil {
+			grape.DependExecutable = &DependExecutable{
+				Binary:       parsed.DependExecutable.Binary,
+				SearchPaths:  append([]string(nil), parsed.DependExecutable.SearchPaths...),
+				VersionArgs:  append([]string(nil), parsed.DependExecutable.VersionArgs...),
+				VersionRegex: parsed.DependExecutable.VersionRegex,
+			}
 		}
 		grape.Blocks = append(grape.Blocks, block)
 	}

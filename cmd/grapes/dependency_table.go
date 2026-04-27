@@ -1,0 +1,62 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func renderDependencyTable(results []grapeDependencyResult, allowWarnings bool) string {
+	rows := [][]string{{"GRAPE", "DEPENDENCY", "STATUS", "LOCATION", "VERSION", "RENDER"}}
+	for _, result := range results {
+		rows = append(rows, []string{
+			result.Grape.Name,
+			result.Dependency,
+			string(result.Status),
+			result.Location,
+			result.Version,
+			renderDecision(result.Status, allowWarnings),
+		})
+	}
+
+	widths := make([]int, len(rows[0]))
+	for _, row := range rows {
+		for i, cell := range row {
+			if len(cell) > widths[i] {
+				widths[i] = len(cell)
+			}
+		}
+	}
+
+	var b strings.Builder
+	for _, row := range rows {
+		for i, cell := range row {
+			if i > 0 {
+				b.WriteString("  ")
+			}
+			fmt.Fprintf(&b, "%-*s", widths[i], cell)
+		}
+		b.WriteByte('\n')
+	}
+
+	for _, result := range results {
+		if result.Detail == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", result.Grape.Name, result.Detail)
+	}
+	return b.String()
+}
+
+func renderDecision(status dependencyStatus, allowWarnings bool) string {
+	switch status {
+	case dependencyStatusOK:
+		return "yes"
+	case dependencyStatusWarning:
+		if allowWarnings {
+			return "yes"
+		}
+		return "no"
+	default:
+		return "no"
+	}
+}

@@ -85,3 +85,63 @@ func TestReviewShellFailsWhenPromptingNonInteractive(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestDependencyPromptAssumeYesUsesSafeMode(t *testing.T) {
+	ui := reviewUI{assumeYes: true, stdout: &bytes.Buffer{}}
+
+	decision, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusWarning}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := decision, dependencyActionSafe; got != want {
+		t.Fatalf("decision = %q, want %q", got, want)
+	}
+}
+
+func TestDependencyPromptSupportsIgnoreWarnings(t *testing.T) {
+	var out bytes.Buffer
+	ui := reviewUI{
+		stdin:       strings.NewReader("w\n"),
+		stdout:      &out,
+		interactive: true,
+	}
+
+	decision, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusWarning}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := decision, dependencyActionAllowWarnings; got != want {
+		t.Fatalf("decision = %q, want %q", got, want)
+	}
+	if !strings.Contains(out.String(), "continue safely") || !strings.Contains(out.String(), "ignore warnings") {
+		t.Fatalf("output = %q, want warning options", out.String())
+	}
+}
+
+func TestDependencyPromptWithoutWarningsUsesYesNo(t *testing.T) {
+	ui := reviewUI{
+		stdin:       strings.NewReader("y\n"),
+		stdout:      &bytes.Buffer{},
+		interactive: true,
+	}
+
+	decision, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusOK}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := decision, dependencyActionSafe; got != want {
+		t.Fatalf("decision = %q, want %q", got, want)
+	}
+}
+
+func TestDependencyPromptFailsWhenNonInteractiveWithoutYes(t *testing.T) {
+	ui := reviewUI{stdin: strings.NewReader(""), stdout: &bytes.Buffer{}, interactive: false}
+
+	_, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusWarning}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--yes") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

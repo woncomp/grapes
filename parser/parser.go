@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -15,12 +16,20 @@ type Block struct {
 	Body  string            // raw block content
 }
 
+type executableDependency struct {
+	Binary       string   `yaml:"binary"`
+	SearchPaths  []string `yaml:"search_paths"`
+	VersionArgs  []string `yaml:"version_args"`
+	VersionRegex string   `yaml:"version_regex"`
+}
+
 type frontmatter struct {
-	Deps    []string          `yaml:"deps"`
-	Phase   string            `yaml:"phase"`
-	Env     map[string]string `yaml:"env"`
-	Paths   []string          `yaml:"paths"`
-	Imports []string          `yaml:"imports"`
+	Deps             []string              `yaml:"deps"`
+	Phase            string                `yaml:"phase"`
+	Env              map[string]string     `yaml:"env"`
+	Paths            []string              `yaml:"paths"`
+	Imports          []string              `yaml:"imports"`
+	DependExecutable *executableDependency `yaml:"depend_executable"`
 }
 
 type rawBlock struct {
@@ -39,10 +48,32 @@ func parseFrontmatter(content string) (frontmatter, error) {
 	return parsed, nil
 }
 
+func validateExecutableDependency(dep *executableDependency, path string) error {
+	if dep == nil {
+		return nil
+	}
+	if strings.TrimSpace(dep.Binary) == "" {
+		return fmt.Errorf("invalid depend_executable in %s: binary is required", path)
+	}
+	if dep.VersionRegex != "" && len(dep.VersionArgs) == 0 {
+		return fmt.Errorf("invalid depend_executable in %s: version_args is required when version_regex is set", path)
+	}
+	if dep.VersionRegex != "" {
+		if _, err := regexp.Compile(dep.VersionRegex); err != nil {
+			return fmt.Errorf("invalid depend_executable in %s: version_regex: %w", path, err)
+		}
+	}
+	return nil
+}
+
 func parseBlock(rb rawBlock, index int, path string) (Block, frontmatter, error) {
 	parsed, err := parseFrontmatter(rb.Frontmatter)
 	if err != nil {
 		return Block{}, frontmatter{}, fmt.Errorf("parsing frontmatter block %d in %s: %w", index+1, path, err)
+	}
+
+	if err := validateExecutableDependency(parsed.DependExecutable, path); err != nil {
+		return Block{}, frontmatter{}, err
 	}
 
 	phase := parsed.Phase

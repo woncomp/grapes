@@ -202,7 +202,16 @@ echo prompt
 		t.Fatal(err)
 	}
 
-	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -245,7 +254,16 @@ echo prompt
 		t.Fatal(err)
 	}
 
-	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -293,7 +311,16 @@ echo prompt
 		t.Fatal(err)
 	}
 
-	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -333,7 +360,16 @@ imports:
 `)
 
 	target := mustParseShell(t, "nushell")
-	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -378,7 +414,16 @@ imports:
 `)
 
 	target := mustParseShell(t, "powershell")
-	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -399,6 +444,225 @@ imports:
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
 	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "zoxide init powershell")
+}
+
+func TestRunDependencyChecksSafeModeSkipsWarningsAndFailures(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "oktool", "echo oktool 1.2.3")
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - ok
+  - warn
+  - miss
+---
+`)
+	writeTempFile(t, sourceDir, "ok.grape", `---
+phase: main
+depend_executable:
+  binary: oktool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo ok-fragment
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+	writeTempFile(t, sourceDir, "miss.grape", `---
+phase: main
+depend_executable:
+  binary: missingtool
+---
+echo miss-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	var stdout bytes.Buffer
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("y\n"),
+		stdout:      &stdout,
+		interactive: true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "ok-fragment")
+	assertFileExcludes(t, content, "warn-fragment")
+	assertFileExcludes(t, content, "miss-fragment")
+	if !strings.Contains(stdout.String(), "warning") || !strings.Contains(stdout.String(), "failed") {
+		t.Fatalf("stdout = %q, want dependency table", stdout.String())
+	}
+}
+
+func TestRunDependencyChecksAllowWarningsModeRendersWarnings(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - warn
+---
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("w\n"),
+		stdout:      &bytes.Buffer{},
+		interactive: true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "warn-fragment")
+}
+
+func TestRunDependencyChecksYesSkipsWarnings(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - warn
+---
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &bytes.Buffer{},
+		interactive: false,
+		assumeYes:   true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	assertFileExcludes(t, content, "warn-fragment")
+}
+
+func TestRunDependencyChecksFailWhenNonInteractiveWithoutYes(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - warn
+---
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &bytes.Buffer{},
+		interactive: false,
+		noLink:      true,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--yes") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestRunLinksOnlySelectedTarget(t *testing.T) {
@@ -471,7 +735,7 @@ imports:
 		targets:     []shells.Shell{target},
 		lookupEnv:   os.LookupEnv,
 		goos:        runtime.GOOS,
-		stdin:       strings.NewReader("y\n"),
+		stdin:       strings.NewReader("y\ny\n"),
 		stdout:      &stdout,
 		interactive: true,
 	}); err != nil {
@@ -557,6 +821,7 @@ imports:
 		stdin:       strings.NewReader(""),
 		stdout:      &stdout,
 		interactive: false,
+		assumeYes:   true,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -637,7 +902,7 @@ imports:
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "--yes") || !strings.Contains(err.Error(), "--nolink") {
+	if !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -660,6 +925,20 @@ func writeTempFile(t *testing.T, dir, name, content string) string {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func createExecutable(t *testing.T, dir, name, command string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	script := "#!/bin/sh\n" + command + "\n"
+	if runtime.GOOS == "windows" {
+		path += ".bat"
+		script = "@echo off\r\n" + command + "\r\n"
+	}
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return path

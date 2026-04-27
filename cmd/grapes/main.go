@@ -224,6 +224,31 @@ func runWithOptions(opts runOptions) error {
 		return err
 	}
 
+	dependencyResults, err := checkGrapeDependencies(sorted, dependencyCheckOptions{lookupEnv: lookupEnv})
+	if err != nil {
+		return err
+	}
+
+	ui := reviewUI{
+		stdin:       opts.stdin,
+		stdout:      stdout,
+		interactive: opts.interactive,
+		color:       opts.color,
+		assumeYes:   opts.assumeYes,
+	}
+	fmt.Fprint(stdout, renderDependencyTable(dependencyResults, false))
+	action, err := ui.chooseDependencyAction(dependencyResults)
+	if err != nil {
+		return err
+	}
+	if action == dependencyActionCancel {
+		fmt.Fprintln(stdout, "Cancelled generation.")
+		return nil
+	}
+
+	allowedWarnings := action == dependencyActionAllowWarnings
+	sorted = filterRenderableGrapes(sorted, dependencyResults, allowedWarnings)
+
 	var outputs []writer.OutputFile
 	for _, target := range opts.targets {
 		for _, phase := range outputPhases {
@@ -273,13 +298,6 @@ func runWithOptions(opts runOptions) error {
 		GOOS:      opts.goos,
 		LookupEnv: lookupEnv,
 		OutputDir: outputDir,
-	}
-	ui := reviewUI{
-		stdin:       opts.stdin,
-		stdout:      stdout,
-		interactive: opts.interactive,
-		color:       opts.color,
-		assumeYes:   opts.assumeYes,
 	}
 
 	for _, target := range opts.targets {
@@ -353,38 +371,44 @@ func pruneManagedOutputs(outputDir string, selectedTargets []shells.Shell) error
 	return nil
 }
 
-// parseAllGrapes recursively discovers and parses all .grape files
-// reachable from the given import list.
+func filterRenderableGrapes(grapes []*parser.GrapeFile, results []grapeDependencyResult, allowWarnings bool) []*parser.GrapeFile {
+	resultByName := make(map[string]grapeDependencyResult, len(results))
+	for _, result := range results {
+		resultByName[result.Grape.Name] = result
+	}
+
+	filtered := make([]*parser.GrapeFile, 0, len(grapes))
+	for _, grape := range grapes {
+		result, ok := resultByName[grape.Name]
+		if !ok {
+			continue
+		}
+		switch result.Status {
+		case dependencyStatusOK:
+			filtered = append(filtered, grape)
+		case dependencyStatusWarning:
+			if allowWarnings {
+				filtered = append(filtered, grape)
+			}
+		}
+	}
+	return filtered
+}
+
+// parseAllGrapes loads the named .grape files referenced by the .grapes file.
 func parseAllGrapes(dir string, imports []string) ([]*parser.GrapeFile, error) {
 	seen := make(map[string]bool)
 	var grapes []*parser.GrapeFile
-
-	var collect func(name string) error
-	collect = func(name string) error {
+	for _, name := range imports {
 		if seen[name] {
-			return nil
+			continue
 		}
 		seen[name] = true
-
 		grape, err := parser.ParseEmbeddedGrape(dir, name, fragments.FS)
 		if err != nil {
-			return err
-		}
-		grapes = append(grapes, grape)
-
-		for _, dep := range grape.Deps {
-			if err := collect(dep); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	for _, name := range imports {
-		if err := collect(name); err != nil {
 			return nil, err
 		}
+		grapes = append(grapes, grape)
 	}
-
 	return grapes, nil
 }
