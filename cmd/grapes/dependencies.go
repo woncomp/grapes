@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -31,6 +32,7 @@ type grapeDependencyResult struct {
 }
 
 type dependencyCheckOptions struct {
+	goos       string
 	lookupEnv  func(string) (string, bool)
 	lookPath   func(string) (string, error)
 	pathExists func(string) bool
@@ -38,6 +40,9 @@ type dependencyCheckOptions struct {
 }
 
 func checkGrapeDependencies(grapes []*parser.GrapeFile, opts dependencyCheckOptions) ([]grapeDependencyResult, error) {
+	if opts.goos == "" {
+		opts.goos = runtime.GOOS
+	}
 	if opts.lookupEnv == nil {
 		opts.lookupEnv = os.LookupEnv
 	}
@@ -127,7 +132,7 @@ func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) 
 }
 
 func checkGrapeFileDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) (grapeDependencyResult, error) {
-	matches := findMatchingFiles(grape.DependFile.Paths, opts.lookupEnv)
+	matches := findMatchingFiles(grape.DependFile.Paths, opts.lookupEnv, opts.goos)
 	if len(matches) == 0 {
 		return grapeDependencyResult{
 			Grape:      grape,
@@ -152,33 +157,65 @@ func findExecutable(dep *parser.DependExecutable, opts dependencyCheckOptions) (
 		return path, true
 	}
 
-	for _, dir := range commonExecutableSearchPaths(opts.lookupEnv) {
-		candidate := filepath.Join(dir, dep.Binary)
-		if opts.pathExists(candidate) {
-			return candidate, true
+	candidates := candidateExecutableNames(dep.Binary, opts.goos)
+	for _, dir := range commonExecutableSearchPaths(opts.lookupEnv, opts.goos) {
+		for _, name := range candidates {
+			candidate := filepath.Join(dir, name)
+			if opts.pathExists(candidate) {
+				return candidate, true
+			}
 		}
 	}
-	for _, dir := range expandSearchPaths(dep.SearchPaths, opts.lookupEnv) {
-		candidate := filepath.Join(dir, dep.Binary)
-		if opts.pathExists(candidate) {
-			return candidate, true
+	for _, dir := range expandSearchPaths(dep.SearchPaths, opts.lookupEnv, opts.goos) {
+		for _, name := range candidates {
+			candidate := filepath.Join(dir, name)
+			if opts.pathExists(candidate) {
+				return candidate, true
+			}
 		}
-	}
+		}
 	return "", false
 }
 
-func commonExecutableSearchPaths(lookupEnv func(string) (string, bool)) []string {
+func candidateExecutableNames(binary, goos string) []string {
+	if goos != "windows" {
+		return []string{binary}
+	}
+	if ext := strings.ToLower(filepath.Ext(binary)); ext != "" {
+		return []string{binary}
+	}
+	return []string{binary, binary + ".exe", binary + ".cmd", binary + ".bat", binary + ".com"}
+}
+
+func commonExecutableSearchPaths(lookupEnv func(string) (string, bool), goos string) []string {
+	if goos == "windows" {
+		var paths []string
+		if localAppData, ok := lookupEnv("LOCALAPPDATA"); ok && strings.TrimSpace(localAppData) != "" {
+			paths = append(paths, filepath.Join(localAppData, "Microsoft", "WinGet", "Links"))
+		}
+		if userProfile := effectiveHomeDir(lookupEnv, goos); strings.TrimSpace(userProfile) != "" {
+			paths = append(paths, filepath.Join(userProfile, "scoop", "shims"))
+		}
+		if choco, ok := lookupEnv("ChocolateyInstall"); ok && strings.TrimSpace(choco) != "" {
+			paths = append(paths, filepath.Join(choco, "bin"))
+		}
+		if appData, ok := lookupEnv("APPDATA"); ok && strings.TrimSpace(appData) != "" {
+			paths = append(paths, filepath.Join(appData, "npm"))
+		}
+		return paths
+	}
+
 	paths := []string{"/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"}
-	if home, ok := lookupEnv("HOME"); ok && strings.TrimSpace(home) != "" {
+	if home := effectiveHomeDir(lookupEnv, goos); strings.TrimSpace(home) != "" {
 		paths = append(paths, filepath.Join(home, ".local", "bin"))
 	}
 	return paths
 }
 
-func findMatchingFiles(patterns []string, lookupEnv func(string) (string, bool)) []string {
+func findMatchingFiles(patterns []string, lookupEnv func(string) (string, bool), goos string) []string {
 	var matches []string
 	seen := make(map[string]bool)
-	for _, pattern := range expandSearchPaths(patterns, lookupEnv) {
+	for _, pattern := range expandSearchPaths(patterns, lookupEnv, goos) {
 		matched, err := filepath.Glob(pattern)
 		if err != nil {
 			continue
@@ -198,12 +235,24 @@ func findMatchingFiles(patterns []string, lookupEnv func(string) (string, bool))
 	return matches
 }
 
-func expandSearchPaths(paths []string, lookupEnv func(string) (string, bool)) []string {
+func effectiveHomeDir(lookupEnv func(string) (string, bool), goos string) string {
+	if home, ok := lookupEnv("HOME"); ok && strings.TrimSpace(home) != "" {
+		return home
+	}
+	if goos == "windows" {
+		if userProfile, ok := lookupEnv("USERPROFILE"); ok && strings.TrimSpace(userProfile) != "" {
+			return userProfile
+		}
+	}
+	return ""
+}
+
+func expandSearchPaths(paths []string, lookupEnv func(string) (string, bool), goos string) []string {
 	expanded := make([]string, 0, len(paths))
 	for _, path := range paths {
 		expandedPath := path
 		if strings.HasPrefix(expandedPath, "~/") {
-			if home, ok := lookupEnv("HOME"); ok && strings.TrimSpace(home) != "" {
+			if home := effectiveHomeDir(lookupEnv, goos); strings.TrimSpace(home) != "" {
 				expandedPath = filepath.Join(home, expandedPath[2:])
 			}
 		}

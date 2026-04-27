@@ -238,6 +238,101 @@ func TestFileDependencyCheckSupportsTildeEnvAndGlobAndRejectsDirectories(t *test
 	}
 }
 
+func TestExecutableDependencyCheckWindowsCommonPathsAndExtensions(t *testing.T) {
+	cases := []struct {
+		name       string
+		envKey     string
+		pathSuffix []string
+	}{
+		{name: "winget links", envKey: "LOCALAPPDATA", pathSuffix: []string{"Microsoft", "WinGet", "Links", "bun.exe"}},
+		{name: "scoop shims", envKey: "USERPROFILE", pathSuffix: []string{"scoop", "shims", "bun.exe"}},
+		{name: "chocolatey bin", envKey: "ChocolateyInstall", pathSuffix: []string{"bin", "bun.exe"}},
+		{name: "appdata npm", envKey: "APPDATA", pathSuffix: []string{"npm", "bun.exe"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			wantPath := filepath.Join(append([]string{root}, tc.pathSuffix...)...)
+			grapes := []*parser.GrapeFile{{
+				Name: "bun",
+				DependExecutable: &parser.DependExecutable{
+					Binary: "bun",
+				},
+			}}
+
+			var lookedIn []string
+			results, err := checkGrapeDependencies(grapes, dependencyCheckOptions{
+				goos: "windows",
+				lookupEnv: func(key string) (string, bool) {
+					if key == tc.envKey {
+						return root, true
+					}
+					return "", false
+				},
+				lookPath: func(string) (string, error) { return "", errors.New("not found") },
+				pathExists: func(path string) bool {
+					lookedIn = append(lookedIn, path)
+					return path == wantPath
+				},
+				runCommand: func(string, ...string) (string, error) { return "", nil },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := results[0].Status, dependencyStatusOK; got != want {
+				t.Fatalf("Status = %q, want %q", got, want)
+			}
+			if got, want := results[0].Location, wantPath; got != want {
+				t.Fatalf("Location = %q, want %q", got, want)
+			}
+			if !containsString(lookedIn, wantPath) {
+				t.Fatalf("lookedIn = %v, want to contain %q", lookedIn, wantPath)
+			}
+		})
+	}
+}
+
+func TestExecutableDependencyCheckWindowsSearchPathsResolveExeExtension(t *testing.T) {
+	root := t.TempDir()
+	grapes := []*parser.GrapeFile{{
+		Name: "uv",
+		DependExecutable: &parser.DependExecutable{
+			Binary:      "uv",
+			SearchPaths: []string{root},
+		},
+	}}
+
+	results, err := checkGrapeDependencies(grapes, dependencyCheckOptions{
+		goos:      "windows",
+		lookupEnv: func(string) (string, bool) { return "", false },
+		lookPath:  func(string) (string, error) { return "", errors.New("not found") },
+		pathExists: func(path string) bool {
+			return path == filepath.Join(root, "uv.exe")
+		},
+		runCommand: func(string, ...string) (string, error) { return "", nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := results[0].Location, filepath.Join(root, "uv.exe"); got != want {
+		t.Fatalf("Location = %q, want %q", got, want)
+	}
+}
+
+func TestExpandSearchPathsUsesUserProfileOnWindows(t *testing.T) {
+	userProfile := t.TempDir()
+	paths := expandSearchPaths([]string{"~/bin"}, func(key string) (string, bool) {
+		if key == "USERPROFILE" {
+			return userProfile, true
+		}
+		return "", false
+	}, "windows")
+	if got, want := paths[0], filepath.Join(userProfile, "bin"); got != want {
+		t.Fatalf("expandSearchPaths() = %q, want %q", got, want)
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if strings.Contains(value, want) || value == want {
