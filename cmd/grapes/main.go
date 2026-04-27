@@ -26,7 +26,21 @@ var (
 type cliOptions struct {
 	masterPath string
 	targets    []shells.Shell
+	assumeYes  bool
 	noLink     bool
+}
+
+type runOptions struct {
+	masterPath  string
+	targets     []shells.Shell
+	assumeYes   bool
+	noLink      bool
+	lookupEnv   func(string) (string, bool)
+	goos        string
+	stdin       io.Reader
+	stdout      io.Writer
+	interactive bool
+	color       bool
 }
 
 func main() {
@@ -42,7 +56,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := run(opts.masterPath, opts.targets, opts.noLink); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath:  opts.masterPath,
+		targets:     opts.targets,
+		assumeYes:   opts.assumeYes,
+		noLink:      opts.noLink,
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       os.Stdin,
+		stdout:      os.Stdout,
+		interactive: isCharDevice(os.Stdin) && isCharDevice(os.Stdout),
+		color:       isCharDevice(os.Stdout),
+	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
@@ -58,6 +83,8 @@ func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions
 		switch {
 		case arg == "-h" || arg == "--help":
 			return cliOptions{}, errHelpRequested
+		case arg == "-y" || arg == "--yes":
+			opts.assumeYes = true
 		case arg == "--nolink":
 			opts.noLink = true
 		case arg == "-t" || arg == "--target":
@@ -117,12 +144,13 @@ func addTarget(targets *[]shells.Shell, seen map[string]bool, raw string) error 
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--nolink]")
+	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--yes] [--nolink]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Generate shell rc files from .grape fragments.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  -t, --target shell   Target shell to generate and link (repeatable; default: current shell)")
+	fmt.Fprintln(w, "  -y, --yes            Approve all shell rc/profile changes without prompting")
 	fmt.Fprintln(w, "      --nolink         Generate managed rc files only; do not link user rc files")
 	fmt.Fprintln(w, "  -h, --help           Show help")
 }
@@ -144,25 +172,48 @@ func managedOutputDir(goos string, lookupEnv func(string) (string, bool)) (strin
 }
 
 func run(masterPath string, targets []shells.Shell, noLink bool) error {
-	outputDir, err := managedOutputDir(runtime.GOOS, os.LookupEnv)
+	return runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     targets,
+		noLink:      noLink,
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       os.Stdin,
+		stdout:      os.Stdout,
+		interactive: isCharDevice(os.Stdin) && isCharDevice(os.Stdout),
+		color:       isCharDevice(os.Stdout),
+	})
+}
+
+func runWithOptions(opts runOptions) error {
+	lookupEnv := opts.lookupEnv
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
+	stdout := opts.stdout
+	if stdout == nil {
+		stdout = io.Discard
+	}
+
+	outputDir, err := managedOutputDir(opts.goos, lookupEnv)
 	if err != nil {
 		return err
 	}
 
-	master, err := parser.ParseFile(masterPath)
+	master, err := parser.ParseFile(opts.masterPath)
 	if err != nil {
 		return err
 	}
 
 	if !master.IsMaster {
-		return fmt.Errorf("%s is not a .grapes file", masterPath)
+		return fmt.Errorf("%s is not a .grapes file", opts.masterPath)
 	}
 
 	if len(master.Imports) == 0 {
 		return fmt.Errorf("master file has no imports")
 	}
 
-	fragDir := filepath.Dir(masterPath)
+	fragDir := filepath.Dir(opts.masterPath)
 	frags, err := parseAllFragments(fragDir, master.Imports)
 	if err != nil {
 		return err
@@ -174,7 +225,7 @@ func run(masterPath string, targets []shells.Shell, noLink bool) error {
 	}
 
 	var outputs []writer.OutputFile
-	for _, target := range targets {
+	for _, target := range opts.targets {
 		for _, phase := range outputPhases {
 			var shellFragments []writer.Fragment
 			for _, f := range sorted {
@@ -182,7 +233,7 @@ func run(masterPath string, targets []shells.Shell, noLink bool) error {
 					if block.Phase != phase {
 						continue
 					}
-					rendered, err := renderer.RenderBlock(runtime.GOOS, target.Name(), block.Env, block.Paths, block.Body)
+					rendered, err := renderer.RenderBlock(opts.goos, target.Name(), block.Env, block.Paths, block.Body)
 					if err != nil {
 						return fmt.Errorf("rendering %s for %s: %w", f.Name, target.Name(), err)
 					}
@@ -208,36 +259,66 @@ func run(masterPath string, targets []shells.Shell, noLink bool) error {
 		return err
 	}
 
-	if err := pruneManagedOutputs(outputDir, targets); err != nil {
+	if err := pruneManagedOutputs(outputDir, opts.targets); err != nil {
 		return err
 	}
 
-	fmt.Printf("Generated rc files in %s for %s\n", outputDir, joinTargetNames(targets))
+	fmt.Fprintf(stdout, "Generated rc files in %s for %s\n", outputDir, joinTargetNames(opts.targets))
 
-	if noLink {
+	if opts.noLink {
 		return nil
 	}
 
 	ctx := shells.TargetContext{
-		GOOS:      runtime.GOOS,
-		LookupEnv: os.LookupEnv,
+		GOOS:      opts.goos,
+		LookupEnv: lookupEnv,
 		OutputDir: outputDir,
 	}
+	ui := reviewUI{
+		stdin:       opts.stdin,
+		stdout:      stdout,
+		interactive: opts.interactive,
+		color:       opts.color,
+		assumeYes:   opts.assumeYes,
+	}
 
-	for _, target := range targets {
-		links, err := target.LinkTargets(ctx)
+	for _, target := range opts.targets {
+		plan, err := previewShellLinkPlan(target, ctx)
 		if err != nil {
-			return fmt.Errorf("resolving link targets for %s: %w", target.Name(), err)
+			return fmt.Errorf("reviewing link targets for %s: %w", target.Name(), err)
 		}
-		for _, link := range links {
-			if err := shells.Install(link.RCFile, link.InstallLines); err != nil {
-				return fmt.Errorf("installing source in %s: %w", link.RCFile, err)
+
+		approved, err := ui.reviewShell(plan)
+		if err != nil {
+			return err
+		}
+		if !approved {
+			if plan.hasChanges() {
+				fmt.Fprintf(stdout, "Skipped %s\n", target.Name())
 			}
-			fmt.Printf("Installed source in %s\n", link.RCFile)
+			continue
+		}
+
+		for _, link := range plan.links {
+			if !link.review.Changed {
+				continue
+			}
+			if err := shells.Install(link.target.RCFile, link.target.InstallLines); err != nil {
+				return fmt.Errorf("installing source in %s: %w", link.target.RCFile, err)
+			}
+			fmt.Fprintf(stdout, "Installed source in %s\n", link.target.RCFile)
 		}
 	}
 
 	return nil
+}
+
+func isCharDevice(file *os.File) bool {
+	info, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
 
 func joinTargetNames(targets []shells.Shell) string {

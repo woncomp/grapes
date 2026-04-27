@@ -30,6 +30,36 @@ func TestParseArgsUsesExplicitTargets(t *testing.T) {
 	}
 }
 
+func TestParseArgsSupportsYesFlag(t *testing.T) {
+	opts, err := parseArgs([]string{"master.grapes", "--yes"}, func(key string) (string, bool) {
+		if key == "SHELL" {
+			return "/bin/zsh", true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !opts.assumeYes {
+		t.Fatal("assumeYes = false, want true")
+	}
+}
+
+func TestParseArgsSupportsYesShortFlag(t *testing.T) {
+	opts, err := parseArgs([]string{"master.grapes", "-y"}, func(key string) (string, bool) {
+		if key == "SHELL" {
+			return "/bin/zsh", true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !opts.assumeYes {
+		t.Fatal("assumeYes = false, want true")
+	}
+}
+
 func TestParseArgsUsesExplicitTargetAlias(t *testing.T) {
 	opts, err := parseArgs([]string{"master.grapes", "-t", "nu"}, func(string) (string, bool) {
 		return "", false
@@ -101,8 +131,11 @@ func TestPrintUsageUsesNewCommandShape(t *testing.T) {
 	printUsage(&buf)
 
 	usage := buf.String()
-	if !strings.Contains(usage, "Usage: grapes <input> [-t shell]... [--nolink]") {
-		t.Fatalf("usage did not contain new command shape: %s", usage)
+	if !strings.Contains(usage, "Usage: grapes <input> [-t shell]... [--yes] [--nolink]") {
+		t.Fatalf("usage did not contain review command shape: %s", usage)
+	}
+	if !strings.Contains(usage, "-y, --yes") {
+		t.Fatalf("usage did not document --yes: %s", usage)
 	}
 	if strings.Contains(usage, "--lazy") {
 		t.Fatalf("usage should not mention --lazy: %s", usage)
@@ -391,7 +424,15 @@ imports:
 		t.Fatal(err)
 	}
 
-	if err := run(masterPath, []shells.Shell{target}, false); err != nil {
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		assumeYes:  true,
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -403,6 +444,202 @@ imports:
 
 	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
 	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+}
+
+func TestRunReviewApproveInstallsAllLinks(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
+`)
+
+	target := mustParseShell(t, "bash")
+	var stdout bytes.Buffer
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("y\n"),
+		stdout:      &stdout,
+		interactive: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+}
+
+func TestRunReviewRejectSkipsAllLinks(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("n\n"),
+		stdout:      &bytes.Buffer{},
+		interactive: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertFileMissing(t, filepath.Join(home, ".bashenv"))
+	assertFileMissing(t, filepath.Join(home, ".bashrc"))
+}
+
+func TestRunReviewSkipsPromptWhenAlreadyUpToDate(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
+`)
+
+	target := mustParseShell(t, "bash")
+	outputDir := expectedRunOutputDir(t, home, appData)
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := shells.Install(filepath.Join(home, ".bashenv"), []string{`source "` + filepath.Join(outputDir, "bashenv") + `"`}); err != nil {
+		t.Fatal(err)
+	}
+	if err := shells.Install(filepath.Join(home, ".bashrc"), []string{`source "` + filepath.Join(outputDir, "bashrc") + `"`}); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &stdout,
+		interactive: false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stdout.String(), "Apply changes") {
+		t.Fatalf("stdout unexpectedly prompted: %q", stdout.String())
+	}
+}
+
+func TestRunReviewYesInstallsWithoutPrompt(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
+`)
+
+	target := mustParseShell(t, "bash")
+	var stdout bytes.Buffer
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &stdout,
+		interactive: false,
+		assumeYes:   true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+	if strings.Contains(stdout.String(), "Apply changes") {
+		t.Fatalf("stdout unexpectedly prompted: %q", stdout.String())
+	}
+}
+
+func TestRunReviewFailsWhenPromptingNonInteractive(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
+`)
+
+	target := mustParseShell(t, "bash")
+	err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &bytes.Buffer{},
+		interactive: false,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--yes") || !strings.Contains(err.Error(), "--nolink") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func expectedRunOutputDir(t *testing.T, home, appData string) string {

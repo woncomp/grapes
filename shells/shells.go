@@ -125,21 +125,16 @@ func posixPath(path string) string {
 // Install adds or updates a marker block in rcFile that sources installLines.
 // If a marker block already exists, it is replaced.
 func Install(rcFile string, installLines []string) error {
-	block := markerStart + "\n" + strings.Join(installLines, "\n") + "\n" + markerEnd + "\n"
 	if err := os.MkdirAll(filepath.Dir(rcFile), 0o755); err != nil {
 		return fmt.Errorf("creating rc directory %s: %w", filepath.Dir(rcFile), err)
 	}
 
-	var existing string
-	if data, err := os.ReadFile(rcFile); err == nil {
-		existing = string(data)
+	existing, err := readRCFile(rcFile)
+	if err != nil {
+		return err
 	}
 
-	if strings.Contains(existing, markerStart) {
-		existing = removeMarkerBlock(existing)
-	}
-
-	content := strings.TrimRight(existing, "\n") + "\n" + block
+	content := installedContent(existing, installLines)
 	return os.WriteFile(rcFile, []byte(content), 0o644)
 }
 
@@ -163,6 +158,33 @@ func registerShell(shell Shell) {
 	for _, alias := range shell.Aliases() {
 		shellByAlias[strings.ToLower(strings.TrimSpace(alias))] = shell
 	}
+}
+
+func installBlock(installLines []string) string {
+	return markerStart + "\n" + strings.Join(installLines, "\n") + "\n" + markerEnd + "\n"
+}
+
+func installedContent(existing string, installLines []string) string {
+	if strings.Contains(existing, markerStart) {
+		existing = removeMarkerBlock(existing)
+	}
+
+	trimmed := strings.TrimRight(existing, "\n")
+	if trimmed == "" {
+		return installBlock(installLines)
+	}
+	return trimmed + "\n" + installBlock(installLines)
+}
+
+func readRCFile(rcFile string) (string, error) {
+	data, err := os.ReadFile(rcFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("reading rc file %s: %w", rcFile, err)
+	}
+	return string(data), nil
 }
 
 func removeMarkerBlock(content string) string {
