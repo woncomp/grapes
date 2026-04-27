@@ -331,6 +331,54 @@ echo bun
 	}
 }
 
+func TestParseGrapeFileDependFile(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "nvm.grape", `---
+phase: main
+depend_file:
+  paths:
+    - ~/.nvm/nvm.sh
+    - $NVM_HOME/nvm.exe
+---
+echo nvm
+`)
+
+	grape, err := ParseGrapeFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if grape.DependFile == nil {
+		t.Fatal("DependFile = nil, want config")
+	}
+	if got, want := len(grape.DependFile.Paths), 2; got != want {
+		t.Fatalf("len(Paths) = %d, want %d", got, want)
+	}
+	if got, want := grape.DependFile.Paths[0], "~/.nvm/nvm.sh"; got != want {
+		t.Fatalf("Paths[0] = %q, want %q", got, want)
+	}
+	if got, want := grape.DependFile.Paths[1], "$NVM_HOME/nvm.exe"; got != want {
+		t.Fatalf("Paths[1] = %q, want %q", got, want)
+	}
+}
+
+func TestParseGrapeFileRejectsDependFileWithoutPaths(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "bad.grape", `---
+phase: main
+depend_file: {}
+---
+echo bad
+`)
+
+	_, err := ParseGrapeFile(path)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "depend_file") || !strings.Contains(err.Error(), "paths") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestParseGrapeFileRejectsDeps(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTempFile(t, dir, "bad.grape", `---

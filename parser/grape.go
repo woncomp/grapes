@@ -15,10 +15,15 @@ type DependExecutable struct {
 	VersionRegex string
 }
 
+type DependFile struct {
+	Paths []string
+}
+
 type GrapeFile struct {
 	Name             string
 	Path             string
 	DependExecutable *DependExecutable
+	DependFile       *DependFile
 	Blocks           []Block
 }
 
@@ -54,6 +59,9 @@ func ParseGrapeString(name, content, path string) (*GrapeFile, error) {
 				VersionArgs:  append([]string(nil), parsed.DependExecutable.VersionArgs...),
 				VersionRegex: parsed.DependExecutable.VersionRegex,
 			}
+		}
+		if i == 0 && parsed.DependFile != nil {
+			grape.DependFile = &DependFile{Paths: append([]string(nil), parsed.DependFile.Paths...)}
 		}
 		grape.Blocks = append(grape.Blocks, block)
 	}

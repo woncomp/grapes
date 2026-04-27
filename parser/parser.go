@@ -23,6 +23,10 @@ type executableDependency struct {
 	VersionRegex string   `yaml:"version_regex"`
 }
 
+type fileDependency struct {
+	Paths []string `yaml:"paths"`
+}
+
 type frontmatter struct {
 	Deps             []string              `yaml:"deps"`
 	Phase            string                `yaml:"phase"`
@@ -30,6 +34,7 @@ type frontmatter struct {
 	Paths            []string              `yaml:"paths"`
 	Imports          []string              `yaml:"imports"`
 	DependExecutable *executableDependency `yaml:"depend_executable"`
+	DependFile       *fileDependency       `yaml:"depend_file"`
 }
 
 type rawBlock struct {
@@ -66,6 +71,16 @@ func validateExecutableDependency(dep *executableDependency, path string) error 
 	return nil
 }
 
+func validateFileDependency(dep *fileDependency, path string) error {
+	if dep == nil {
+		return nil
+	}
+	if len(dep.Paths) == 0 {
+		return fmt.Errorf("invalid depend_file in %s: paths is required", path)
+	}
+	return nil
+}
+
 func parseBlock(rb rawBlock, index int, path string) (Block, frontmatter, error) {
 	parsed, err := parseFrontmatter(rb.Frontmatter)
 	if err != nil {
@@ -73,6 +88,9 @@ func parseBlock(rb rawBlock, index int, path string) (Block, frontmatter, error)
 	}
 
 	if err := validateExecutableDependency(parsed.DependExecutable, path); err != nil {
+		return Block{}, frontmatter{}, err
+	}
+	if err := validateFileDependency(parsed.DependFile, path); err != nil {
 		return Block{}, frontmatter{}, err
 	}
 

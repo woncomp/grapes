@@ -457,6 +457,98 @@ imports:
 	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "zoxide init powershell")
 }
 
+func TestRunDependencyChecksFileDependencyRendersWhenFileExists(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	nvmDir := filepath.Join(home, ".nvm")
+	if err := os.MkdirAll(nvmDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nvmDir, "nvm.sh"), []byte("echo nvm"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - nvm
+---
+`)
+	writeTempFile(t, sourceDir, "nvm.grape", `---
+phase: main
+depend_file:
+  paths:
+    - ~/.nvm/nvm.sh
+---
+echo nvm-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("y\n"),
+		stdout:      &bytes.Buffer{},
+		interactive: true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "nvm-fragment")
+}
+
+func TestRunDependencyChecksFileDependencySkipsWhenFileMissing(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - nvm
+---
+`)
+	writeTempFile(t, sourceDir, "nvm.grape", `---
+phase: main
+depend_file:
+  paths:
+    - ~/.nvm/nvm.sh
+---
+echo nvm-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("y\n"),
+		stdout:      &bytes.Buffer{},
+		interactive: true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	assertFileExcludes(t, content, "nvm-fragment")
+}
+
 func TestRunDependencyChecksSafeModeSkipsWarningsAndFailures(t *testing.T) {
 	home := t.TempDir()
 	appData := ""

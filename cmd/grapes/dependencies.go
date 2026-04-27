@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/woncomp/grapes/parser"
@@ -68,7 +69,7 @@ func checkGrapeDependencies(grapes []*parser.GrapeFile, opts dependencyCheckOpti
 }
 
 func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) (grapeDependencyResult, error) {
-	if grape.DependExecutable == nil {
+	if grape.DependExecutable == nil && grape.DependFile == nil {
 		return grapeDependencyResult{
 			Grape:      grape,
 			Dependency: "n/a",
@@ -76,6 +77,9 @@ func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) 
 			Location:   "n/a",
 			Version:    "n/a",
 		}, nil
+	}
+	if grape.DependFile != nil {
+		return checkGrapeFileDependency(grape, opts)
 	}
 
 	dep := grape.DependExecutable
@@ -122,6 +126,27 @@ func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) 
 	return result, nil
 }
 
+func checkGrapeFileDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) (grapeDependencyResult, error) {
+	matches := findMatchingFiles(grape.DependFile.Paths, opts.lookupEnv)
+	if len(matches) == 0 {
+		return grapeDependencyResult{
+			Grape:      grape,
+			Dependency: "file",
+			Status:     dependencyStatusFailed,
+			Location:   "not found",
+			Version:    "n/a",
+			Detail:     "no configured depend_file patterns matched an existing file",
+		}, nil
+	}
+	return grapeDependencyResult{
+		Grape:      grape,
+		Dependency: "file",
+		Status:     dependencyStatusOK,
+		Location:   matches[0],
+		Version:    "n/a",
+	}, nil
+}
+
 func findExecutable(dep *parser.DependExecutable, opts dependencyCheckOptions) (string, bool) {
 	if path, err := opts.lookPath(dep.Binary); err == nil && strings.TrimSpace(path) != "" {
 		return path, true
@@ -148,6 +173,29 @@ func commonExecutableSearchPaths(lookupEnv func(string) (string, bool)) []string
 		paths = append(paths, filepath.Join(home, ".local", "bin"))
 	}
 	return paths
+}
+
+func findMatchingFiles(patterns []string, lookupEnv func(string) (string, bool)) []string {
+	var matches []string
+	seen := make(map[string]bool)
+	for _, pattern := range expandSearchPaths(patterns, lookupEnv) {
+		matched, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, path := range matched {
+			info, err := os.Stat(path)
+			if err != nil || info.IsDir() {
+				continue
+			}
+			if !seen[path] {
+				seen[path] = true
+				matches = append(matches, path)
+			}
+		}
+	}
+	sort.Strings(matches)
+	return matches
 }
 
 func expandSearchPaths(paths []string, lookupEnv func(string) (string, bool)) []string {

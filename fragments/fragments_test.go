@@ -87,6 +87,18 @@ func TestEmbeddedBuiltinDependencyConfigs(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			if tc.name == "nvm" {
+				if frag.DependExecutable != nil {
+					t.Fatalf("DependExecutable = %#v, want nil", frag.DependExecutable)
+				}
+				if frag.DependFile == nil {
+					t.Fatal("DependFile = nil, want config")
+				}
+				if len(frag.DependFile.Paths) == 0 {
+					t.Fatal("DependFile.Paths empty, want paths")
+				}
+				return
+			}
 			if !tc.wantConfigured {
 				if frag.DependExecutable != nil {
 					t.Fatalf("DependExecutable = %#v, want nil", frag.DependExecutable)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -156,6 +157,84 @@ func TestExecutableDependencyCheckVersionWarningsAndSuccess(t *testing.T) {
 				t.Fatalf("Version = %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+func TestFileDependencyCheckMatchesExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	match := filepath.Join(dir, "nvm.sh")
+	if err := os.WriteFile(match, []byte("echo nvm"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	grapes := []*parser.GrapeFile{{
+		Name:       "nvm",
+		DependFile: &parser.DependFile{Paths: []string{filepath.Join(dir, "*.sh")}},
+	}}
+
+	results, err := checkGrapeDependencies(grapes, dependencyCheckOptions{lookupEnv: func(string) (string, bool) { return "", false }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := results[0].Status, dependencyStatusOK; got != want {
+		t.Fatalf("Status = %q, want %q", got, want)
+	}
+	if got, want := results[0].Location, match; got != want {
+		t.Fatalf("Location = %q, want %q", got, want)
+	}
+	if got, want := results[0].Version, "n/a"; got != want {
+		t.Fatalf("Version = %q, want %q", got, want)
+	}
+}
+
+func TestFileDependencyCheckSupportsTildeEnvAndGlobAndRejectsDirectories(t *testing.T) {
+	home := t.TempDir()
+	nvmHome := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".nvm"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file1 := filepath.Join(home, ".nvm", "nvm.sh")
+	if err := os.WriteFile(file1, []byte("echo nvm"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(nvmHome, "v1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file2 := filepath.Join(nvmHome, "v1", "nvm.exe")
+	if err := os.WriteFile(file2, []byte("binary"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(nvmHome, "dir-only.exe"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	grapes := []*parser.GrapeFile{{
+		Name: "nvm",
+		DependFile: &parser.DependFile{Paths: []string{
+			"~/.nvm/*.sh",
+			"$NVM_HOME/*/nvm.exe",
+			"$NVM_HOME/dir-only.exe",
+		}},
+	}}
+
+	results, err := checkGrapeDependencies(grapes, dependencyCheckOptions{lookupEnv: func(key string) (string, bool) {
+		switch key {
+		case "HOME":
+			return home, true
+		case "NVM_HOME":
+			return nvmHome, true
+		default:
+			return "", false
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := results[0].Status, dependencyStatusOK; got != want {
+		t.Fatalf("Status = %q, want %q", got, want)
+	}
+	if got := results[0].Location; got != file1 && got != file2 {
+		t.Fatalf("Location = %q, want one of %q or %q", got, file1, file2)
 	}
 }
 
