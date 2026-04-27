@@ -9,7 +9,7 @@ import (
 // Supported directives: #ifdef, #ifndef, #elif, #else, #endif.
 func Process(body string, shell string) (string, error) {
 	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
-	output := []string{fmt.Sprintf(`export __GRAPES_SHELL="%s"`, shell)}
+	output := []string{shellInjectionLine(shell)}
 	stack := []blockState{{include: true, satisfied: true}}
 
 	for i, line := range lines {
@@ -42,6 +42,17 @@ func Process(body string, shell string) (string, error) {
 		return "", nil
 	}
 	return strings.Join(output, "\n") + "\n", nil
+}
+
+func shellInjectionLine(shell string) string {
+	switch strings.ToLower(shell) {
+	case "nushell":
+		return fmt.Sprintf(`$env.__GRAPES_SHELL = "%s"`, shell)
+	case "powershell":
+		return fmt.Sprintf(`$env:__GRAPES_SHELL = "%s"`, shell)
+	default:
+		return fmt.Sprintf(`export __GRAPES_SHELL="%s"`, shell)
+	}
 }
 
 type blockState struct {

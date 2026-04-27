@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -26,6 +27,32 @@ func TestParseArgsUsesExplicitTargets(t *testing.T) {
 	}
 	if !opts.noLink {
 		t.Fatal("noLink = false, want true")
+	}
+}
+
+func TestParseArgsUsesExplicitTargetAlias(t *testing.T) {
+	opts, err := parseArgs([]string{"master.grapes", "-t", "nu"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := joinTargetNames(opts.targets), "nushell"; got != want {
+		t.Fatalf("targets = %q, want %q", got, want)
+	}
+}
+
+func TestParseArgsUsesPowerShellAlias(t *testing.T) {
+	opts, err := parseArgs([]string{"master.grapes", "-t", "pwsh"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := joinTargetNames(opts.targets), "powershell"; got != want {
+		t.Fatalf("targets = %q, want %q", got, want)
 	}
 }
 
@@ -82,10 +109,45 @@ func TestPrintUsageUsesNewCommandShape(t *testing.T) {
 	}
 }
 
+func TestManagedOutputDirUnix(t *testing.T) {
+	dir, err := managedOutputDir("linux", func(key string) (string, bool) {
+		if key == "HOME" {
+			return "/tmp/home", true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := dir, filepath.Join("/tmp/home", ".config", "grapes"); got != want {
+		t.Fatalf("managedOutputDir() = %q, want %q", got, want)
+	}
+}
+
+func TestManagedOutputDirWindowsUsesAppData(t *testing.T) {
+	dir, err := managedOutputDir("windows", func(key string) (string, bool) {
+		if key == "APPDATA" {
+			return `C:\Users\me\AppData\Roaming`, true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := dir, filepath.Join(`C:\Users\me\AppData\Roaming`, "grapes"); got != want {
+		t.Fatalf("managedOutputDir() = %q, want %q", got, want)
+	}
+}
+
 func TestRunNoLinkGeneratesOnlySelectedTargets(t *testing.T) {
 	home := t.TempDir()
+	appData := ""
 	sourceDir := t.TempDir()
 	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
 
 	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
 imports:
@@ -111,7 +173,7 @@ echo prompt
 		t.Fatal(err)
 	}
 
-	outputDir := filepath.Join(home, ".config", "grapes")
+	outputDir := expectedRunOutputDir(t, home, appData)
 	assertFileExists(t, filepath.Join(outputDir, "zshenv"))
 	assertFileExists(t, filepath.Join(outputDir, "zshrc"))
 	assertFileMissing(t, filepath.Join(outputDir, "bashenv"))
@@ -120,10 +182,201 @@ echo prompt
 	assertFileMissing(t, filepath.Join(home, ".zshrc"))
 }
 
-func TestRunLinksOnlySelectedTarget(t *testing.T) {
+func TestRunNoLinkRendersNushellEnvAndPathsNatively(t *testing.T) {
 	home := t.TempDir()
+	appData := ""
 	sourceDir := t.TempDir()
 	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: env
+env:
+  PROMPT_ENV: "1"
+paths:
+  - /tool/bin
+---
+echo prompt
+`)
+
+	target, err := shells.Parse("nushell")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	data, err := os.ReadFile(filepath.Join(outputDir, "nushell-env.nu"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	assertLineContainsFragments(t, content, "$env.__GRAPES_SHELL = ", "nushell")
+	assertLineContainsFragments(t, content, "$env.PROMPT_ENV = ", "1")
+	assertLineContainsFragments(t, content, "$env.PATH = ", "prepend", "/tool/bin")
+	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
+	assertLineExcludesFragments(t, content, "PATH", "export ")
+	assertLineExcludesFragments(t, content, "__GRAPES_SHELL", "export ")
+}
+
+func TestRunNoLinkRendersPowerShellEnvAndPathsNatively(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: env
+env:
+  PROMPT_ENV: "1"
+paths:
+  - /tool/bin
+---
+echo prompt
+`)
+
+	target, err := shells.Parse("powershell")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	data, err := os.ReadFile(filepath.Join(outputDir, "powershell-env.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	assertLineContainsFragments(t, content, "$env:__GRAPES_SHELL = ", "powershell")
+	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
+	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
+	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
+	assertLineExcludesFragments(t, content, "PATH", "export ")
+	assertLineExcludesFragments(t, content, "__GRAPES_SHELL", "export ")
+}
+
+func TestRunNoLinkBuiltinsAvoidPosixSyntaxForNushell(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - go
+  - bun
+  - nvm
+  - uv
+  - zoxide
+  - fzf
+---
+`)
+
+	target := mustParseShell(t, "nushell")
+	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	envContent := mustReadFile(t, filepath.Join(outputDir, "nushell-env.nu"))
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "nushell-config.nu"))
+	combined := envContent + "\n" + mainContent
+
+	assertNoPosixBuiltInSyntax(t, combined)
+	assertLineContainsFragments(t, envContent, "$env.GOPATH = ", "path join", "go")
+	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GOPATH")
+	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
+	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
+	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", ".local")
+	assertFileExcludes(t, combined, "nvm.sh")
+	assertFileExcludes(t, combined, "bash_completion")
+	assertFileExcludes(t, combined, "fzf --bash")
+	assertFileExcludes(t, combined, "fzf --zsh")
+	assertFileExcludes(t, combined, "generate-shell-completion nushell")
+	assertFileExcludes(t, combined, "zoxide init")
+}
+
+func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPowerShell(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - go
+  - bun
+  - nvm
+  - uv
+  - zoxide
+  - fzf
+---
+`)
+
+	target := mustParseShell(t, "powershell")
+	if err := run(masterPath, []shells.Shell{target}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	envContent := mustReadFile(t, filepath.Join(outputDir, "powershell-env.ps1"))
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "powershell-profile.ps1"))
+	combined := envContent + "\n" + mainContent
+
+	assertNoPosixBuiltInSyntax(t, combined)
+	assertLineContainsFragments(t, envContent, "$env:GOPATH = ", "Join-Path", "go")
+	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "GOPATH")
+	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
+	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
+	assertLineContainsFragments(t, envContent, "$env:PATH = ", ".local", "$HOME")
+	assertFileExcludes(t, combined, "nvm.sh")
+	assertFileExcludes(t, combined, "bash_completion")
+	assertFileExcludes(t, combined, "fzf --bash")
+	assertFileExcludes(t, combined, "fzf --zsh")
+	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
+	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "zoxide init powershell")
+}
+
+func TestRunLinksOnlySelectedTarget(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
 
 	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
 imports:
@@ -142,7 +395,7 @@ imports:
 		t.Fatal(err)
 	}
 
-	outputDir := filepath.Join(home, ".config", "grapes")
+	outputDir := expectedRunOutputDir(t, home, appData)
 	assertFileExists(t, filepath.Join(outputDir, "bashenv"))
 	assertFileExists(t, filepath.Join(outputDir, "bashrc"))
 	assertFileMissing(t, filepath.Join(home, ".zshenv"))
@@ -150,6 +403,17 @@ imports:
 
 	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
 	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+}
+
+func expectedRunOutputDir(t *testing.T, home, appData string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		if appData == "" {
+			t.Fatal("APPDATA must be set for Windows run() tests")
+		}
+		return filepath.Join(appData, "grapes")
+	}
+	return filepath.Join(home, ".config", "grapes")
 }
 
 func writeTempFile(t *testing.T, dir, name, content string) string {
@@ -186,5 +450,74 @@ func assertFileContains(t *testing.T, path string, want string) {
 	}
 	if !strings.Contains(string(data), want) {
 		t.Fatalf("%s did not contain %q; got %q", path, want, string(data))
+	}
+}
+
+func mustParseShell(t *testing.T, name string) shells.Shell {
+	t.Helper()
+	target, err := shells.Parse(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return target
+}
+
+func mustReadFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func assertFileExcludes(t *testing.T, content, forbidden string) {
+	t.Helper()
+	if strings.Contains(content, forbidden) {
+		t.Fatalf("content unexpectedly contained %q: %q", forbidden, content)
+	}
+}
+
+func assertNoPosixBuiltInSyntax(t *testing.T, content string) {
+	t.Helper()
+	for _, forbidden := range []string{
+		`eval "$(`,
+		"source <(",
+		`[ -s `,
+		`${VAR:-`,
+		`${GOPATH:-`,
+		`${BUN_INSTALL:-`,
+		`${NVM_DIR:-`,
+	} {
+		assertFileExcludes(t, content, forbidden)
+	}
+}
+
+func assertLineContainsFragments(t *testing.T, content string, fragments ...string) {
+	t.Helper()
+
+	for _, line := range strings.Split(content, "\n") {
+		matches := true
+		for _, fragment := range fragments {
+			if !strings.Contains(line, fragment) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return
+		}
+	}
+
+	t.Fatalf("no line in %q contained fragments %q", content, fragments)
+}
+
+func assertLineExcludesFragments(t *testing.T, content, required, forbidden string) {
+	t.Helper()
+
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, required) && strings.Contains(line, forbidden) {
+			t.Fatalf("line %q unexpectedly contained %q", line, forbidden)
+		}
 	}
 }

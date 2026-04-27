@@ -1,4 +1,10 @@
 ---
 phase: main
 ---
-eval "$(zoxide init $__GRAPES_SHELL)"
+#ifdef BASH
+eval "$(zoxide init bash)"
+#elif ZSH
+eval "$(zoxide init zsh)"
+#elif POWERSHELL
+zoxide init powershell | Out-String | Invoke-Expression
+#endif

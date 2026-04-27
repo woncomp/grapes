@@ -1,7 +1,18 @@
 ---
 phase: env
-env:
-  GOPATH: "${GOPATH:-$HOME/go}"
-paths:
-  - $GOPATH/bin
 ---
+#ifdef BASH
+export GOPATH="${GOPATH:-$HOME/go}"
+export PATH="$GOPATH/bin:$PATH"
+#elif ZSH
+export GOPATH="${GOPATH:-$HOME/go}"
+export PATH="$GOPATH/bin:$PATH"
+#elif NUSHELL
+$env.GOPATH = ($env.GOPATH? | default ($env.HOME | path join "go"))
+$env.PATH = ($env.PATH | prepend ($env.GOPATH | path join "bin"))
+#elif POWERSHELL
+if (-not $env:GOPATH) {
+  $env:GOPATH = Join-Path $HOME "go"
+}
+$env:PATH = (Join-Path $env:GOPATH "bin") + [System.IO.Path]::PathSeparator + $env:PATH
+#endif

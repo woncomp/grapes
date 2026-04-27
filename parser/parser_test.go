@@ -62,6 +62,44 @@ echo bash
 	}
 }
 
+func TestParseFragmentKeepsStructuredEnvAndRawBody(t *testing.T) {
+	dir := t.TempDir()
+	content := `---
+deps:
+  - path
+phase: env
+env:
+  FOO: bar
+paths:
+  - /tool/bin
+---
+echo raw
+`
+	path := writeTempFile(t, dir, "test.grape", content)
+
+	frag, err := ParseFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block := frag.Blocks[0]
+	if got, want := block.Env["FOO"], "bar"; got != want {
+		t.Fatalf("Env[FOO] = %q, want %q", got, want)
+	}
+	if got, want := len(block.Paths), 1; got != want {
+		t.Fatalf("len(Paths) = %d, want %d", got, want)
+	}
+	if got, want := block.Paths[0], "/tool/bin"; got != want {
+		t.Fatalf("Paths[0] = %q, want %q", got, want)
+	}
+	if got, want := strings.TrimSpace(block.Body), "echo raw"; got != want {
+		t.Fatalf("Body = %q, want %q", got, want)
+	}
+	if strings.Contains(block.Body, "export FOO") {
+		t.Fatalf("Body should not contain parser-expanded exports: %q", block.Body)
+	}
+}
+
 func TestParseMaster(t *testing.T) {
 	dir := t.TempDir()
 	content := `---
@@ -209,6 +247,34 @@ export FOO=bar
 	}
 }
 
+func TestParseStringKeepsStructuredEnvAndRawBody(t *testing.T) {
+	content := `---
+phase: env
+env:
+  FOO: bar
+paths:
+  - /tool/bin
+---
+echo raw
+`
+
+	frag, err := ParseString("test", content)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block := frag.Blocks[0]
+	if got, want := block.Env["FOO"], "bar"; got != want {
+		t.Fatalf("Env[FOO] = %q, want %q", got, want)
+	}
+	if got, want := block.Paths[0], "/tool/bin"; got != want {
+		t.Fatalf("Paths[0] = %q, want %q", got, want)
+	}
+	if got, want := strings.TrimSpace(block.Body), "echo raw"; got != want {
+		t.Fatalf("Body = %q, want %q", got, want)
+	}
+}
+
 func TestParseStringNoFrontmatter(t *testing.T) {
 	frag, err := ParseString("plain", "export FOO=bar\n")
 	if err != nil {
@@ -333,11 +399,8 @@ eval "$(tool init)"
 	if len(frag.Blocks[0].Paths) != 1 || frag.Blocks[0].Paths[0] != "$HOME/tool/bin" {
 		t.Errorf("block 0 paths = %v, want [$HOME/tool/bin]", frag.Blocks[0].Paths)
 	}
-	if !strings.Contains(frag.Blocks[0].Body, `export TOOL_HOME="$HOME/tool"`) {
-		t.Errorf("block 0 body missing env export, got: %q", frag.Blocks[0].Body)
-	}
-	if !strings.Contains(frag.Blocks[0].Body, `export PATH="$HOME/tool/bin:$PATH"`) {
-		t.Errorf("block 0 body missing path export, got: %q", frag.Blocks[0].Body)
+	if strings.TrimSpace(frag.Blocks[0].Body) != "" {
+		t.Errorf("block 0 body = %q, want empty raw body", frag.Blocks[0].Body)
 	}
 
 	// Second block: main phase with body
@@ -361,12 +424,14 @@ env:
 		t.Fatal(err)
 	}
 
-	body := frag.Blocks[0].Body
-	if !strings.Contains(body, `export GOBIN="$GOPATH/bin"`) {
-		t.Errorf("body missing GOBIN export: %q", body)
+	if got, want := frag.Blocks[0].Env["GOBIN"], "$GOPATH/bin"; got != want {
+		t.Errorf("Env[GOBIN] = %q, want %q", got, want)
 	}
-	if !strings.Contains(body, `export GOPATH="${GOPATH:-$HOME/go}"`) {
-		t.Errorf("body missing GOPATH export: %q", body)
+	if got, want := frag.Blocks[0].Env["GOPATH"], "${GOPATH:-$HOME/go}"; got != want {
+		t.Errorf("Env[GOPATH] = %q, want %q", got, want)
+	}
+	if got := frag.Blocks[0].Body; got != "" {
+		t.Errorf("Body = %q, want empty raw body", got)
 	}
 }
 
@@ -382,12 +447,17 @@ paths:
 		t.Fatal(err)
 	}
 
-	body := frag.Blocks[0].Body
-	if !strings.Contains(body, `export PATH="$HOME/.local/bin:$PATH"`) {
-		t.Errorf("body missing first path: %q", body)
+	if got, want := len(frag.Blocks[0].Paths), 2; got != want {
+		t.Fatalf("len(Paths) = %d, want %d", got, want)
 	}
-	if !strings.Contains(body, `export PATH="$HOME/tool/bin:$PATH"`) {
-		t.Errorf("body missing second path: %q", body)
+	if got, want := frag.Blocks[0].Paths[0], "$HOME/.local/bin"; got != want {
+		t.Errorf("Paths[0] = %q, want %q", got, want)
+	}
+	if got, want := frag.Blocks[0].Paths[1], "$HOME/tool/bin"; got != want {
+		t.Errorf("Paths[1] = %q, want %q", got, want)
+	}
+	if got := frag.Blocks[0].Body; got != "" {
+		t.Errorf("Body = %q, want empty raw body", got)
 	}
 }
 
@@ -404,14 +474,17 @@ paths:
 		t.Fatal(err)
 	}
 
-	body := frag.Blocks[0].Body
-	envIdx := strings.Index(body, `export TOOL=`)
-	pathIdx := strings.Index(body, `export PATH=`)
-	if envIdx == -1 || pathIdx == -1 {
-		t.Fatalf("missing exports: %q", body)
+	if got, want := frag.Blocks[0].Env["TOOL"], "$HOME/tool"; got != want {
+		t.Fatalf("Env[TOOL] = %q, want %q", got, want)
 	}
-	if envIdx > pathIdx {
-		t.Errorf("env export should come before path export")
+	if got, want := len(frag.Blocks[0].Paths), 1; got != want {
+		t.Fatalf("len(Paths) = %d, want %d", got, want)
+	}
+	if got, want := frag.Blocks[0].Paths[0], "$TOOL/bin"; got != want {
+		t.Fatalf("Paths[0] = %q, want %q", got, want)
+	}
+	if got := frag.Blocks[0].Body; got != "" {
+		t.Errorf("Body = %q, want empty raw body", got)
 	}
 }
 
@@ -448,8 +521,11 @@ env:
 	if frag.Blocks[0].Phase != "env" {
 		t.Errorf("phase = %q, want env", frag.Blocks[0].Phase)
 	}
-	if !strings.Contains(frag.Blocks[0].Body, `export FOO="bar"`) {
-		t.Errorf("body missing env export: %q", frag.Blocks[0].Body)
+	if got, want := frag.Blocks[0].Env["FOO"], "bar"; got != want {
+		t.Errorf("Env[FOO] = %q, want %q", got, want)
+	}
+	if frag.Blocks[0].Body != "" {
+		t.Errorf("Body = %q, want empty raw body", frag.Blocks[0].Body)
 	}
 }
 

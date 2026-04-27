@@ -9,7 +9,7 @@ import (
 
 func TestSupportedNames(t *testing.T) {
 	names := SupportedNames()
-	if got, want := strings.Join(names, ","), "bash,zsh"; got != want {
+	if got, want := strings.Join(names, ","), "bash,nushell,powershell,zsh"; got != want {
 		t.Fatalf("SupportedNames() = %q, want %q", got, want)
 	}
 }
@@ -68,7 +68,7 @@ func TestInstallFresh(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
+	if err := Install(rcFile, []string{`source "$HOME/.config/grapes/bashrc"`}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,10 +99,10 @@ func TestInstallUpdate(t *testing.T) {
 	if err := os.WriteFile(rcFile, []byte("# existing\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
+	if err := Install(rcFile, []string{`source "$HOME/.config/grapes/bashrc"`}); err != nil {
 		t.Fatal(err)
 	}
-	if err := Install(rcFile, "$HOME/.config/grapes/new-bashrc"); err != nil {
+	if err := Install(rcFile, []string{`source "$HOME/.config/grapes/new-bashrc"`}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +127,7 @@ func TestInstallEmptyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
+	if err := Install(rcFile, []string{`source "$HOME/.config/grapes/bashrc"`}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +147,7 @@ func TestUninstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Install(rcFile, "$HOME/.config/grapes/bashrc"); err != nil {
+	if err := Install(rcFile, []string{`source "$HOME/.config/grapes/bashrc"`}); err != nil {
 		t.Fatal(err)
 	}
 	if err := Uninstall(rcFile); err != nil {
@@ -176,5 +176,63 @@ func TestUninstallNonExistent(t *testing.T) {
 	rcFile := filepath.Join(dir, ".bashrc")
 	if err := Uninstall(rcFile); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestInstallSupportsMultipleLines(t *testing.T) {
+	dir := t.TempDir()
+	rcFile := filepath.Join(dir, "PowerShell", "Microsoft.PowerShell_profile.ps1")
+
+	err := Install(rcFile, []string{
+		`. "$HOME/.config/grapes/powershell-env.ps1"`,
+		`. "$HOME/.config/grapes/powershell-profile.ps1"`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(rcFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, `. "$HOME/.config/grapes/powershell-env.ps1"`) {
+		t.Fatalf("missing env install line: %q", content)
+	}
+	if !strings.Contains(content, `. "$HOME/.config/grapes/powershell-profile.ps1"`) {
+		t.Fatalf("missing main install line: %q", content)
+	}
+}
+
+func TestInstallCreatesParentDirectories(t *testing.T) {
+	dir := t.TempDir()
+	rcFile := filepath.Join(dir, "nested", "profile")
+
+	if err := Install(rcFile, []string{`source "$HOME/.config/grapes/bashrc"`}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Dir(rcFile)); err != nil {
+		t.Fatalf("expected parent directory to exist: %v", err)
+	}
+}
+
+func TestInstallReturnsContextOnParentDirectoryCreationFailure(t *testing.T) {
+	dir := t.TempDir()
+	parent := filepath.Join(dir, "blocked")
+	if err := os.WriteFile(parent, []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rcFile := filepath.Join(parent, "profile")
+	err := Install(rcFile, []string{`source "$HOME/.config/grapes/bashrc"`})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	want := "creating rc directory " + filepath.Dir(rcFile)
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("Install() error = %q, want substring %q", err.Error(), want)
 	}
 }

@@ -3,10 +3,8 @@ package parser
 import (
 	"embed"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -17,7 +15,7 @@ type Block struct {
 	Phase string            // "env" or "main"
 	Env   map[string]string // first-class env vars
 	Paths []string          // first-class PATH entries
-	Body  string            // raw shell code (after env/paths expansion)
+	Body  string            // raw block content
 }
 
 // Fragment represents a parsed .grape or .grapes file.
@@ -139,7 +137,7 @@ func parseContent(name, content, path string, isMaster bool) (*Fragment, error) 
 			Phase: phase,
 			Env:   parsed.Env,
 			Paths: parsed.Paths,
-			Body:  expandBlock(&parsed, rb.Body),
+			Body:  rb.Body,
 		}
 		frag.Blocks = append(frag.Blocks, block)
 	}
@@ -153,41 +151,6 @@ func parseContent(name, content, path string, isMaster bool) (*Fragment, error) 
 	}
 
 	return frag, nil
-}
-
-// expandBlock assembles the final body for a block:
-// env exports → path exports → raw body.
-func expandBlock(fm *frontmatter, rawBody string) string {
-	hasEnv := len(fm.Env) > 0
-	hasPaths := len(fm.Paths) > 0
-
-	// If no frontmatter fields, return body as-is
-	if !hasEnv && !hasPaths {
-		return rawBody
-	}
-
-	var lines []string
-
-	// Env vars — sorted for deterministic output
-	for _, k := range slices.Sorted(maps.Keys(fm.Env)) {
-		lines = append(lines, fmt.Sprintf(`export %s="%s"`, k, fm.Env[k]))
-	}
-
-	// Paths — prepended in order
-	for _, p := range fm.Paths {
-		lines = append(lines, fmt.Sprintf(`export PATH="%s:$PATH"`, p))
-	}
-
-	// Raw body
-	if rawBody != "" {
-		lines = append(lines, rawBody)
-	}
-
-	if len(lines) == 0 {
-		return ""
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 // splitBlocks splits content into multiple rawBlock structures.

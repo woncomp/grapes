@@ -20,12 +20,18 @@ type Shell interface {
 	Name() string
 	Aliases() []string
 	ManagedFilename(phase string) string
-	LinkTargets(home, outputDir string) []LinkTarget
+	LinkTargets(TargetContext) ([]LinkTarget, error)
+}
+
+type TargetContext struct {
+	GOOS      string
+	LookupEnv func(string) (string, bool)
+	OutputDir string
 }
 
 type LinkTarget struct {
-	RCFile     string
-	SourcePath string
+	RCFile       string
+	InstallLines []string
 }
 
 var (
@@ -71,11 +77,58 @@ func DetectCurrent(lookupEnv func(string) (string, bool)) (Shell, error) {
 	return shell, nil
 }
 
-// Install adds or updates a marker block in rcFile that sources sourcePath.
+func homeDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
+	keys := []string{"HOME"}
+	if goos == "windows" {
+		keys = []string{"HOME", "USERPROFILE"}
+	}
+	for _, key := range keys {
+		if value, ok := lookupEnv(key); ok && strings.TrimSpace(value) != "" {
+			return value, nil
+		}
+	}
+	return "", fmt.Errorf("home directory environment variable not set")
+}
+
+func configDir(goos string, lookupEnv func(string) (string, bool), appName string) (string, error) {
+	if goos == "windows" {
+		appData, ok := lookupEnv("APPDATA")
+		if !ok || strings.TrimSpace(appData) == "" {
+			return "", fmt.Errorf("APPDATA environment variable not set")
+		}
+		return filepath.Join(appData, appName), nil
+	}
+
+	home, ok := lookupEnv("HOME")
+	if !ok || strings.TrimSpace(home) == "" {
+		return "", fmt.Errorf("HOME environment variable not set")
+	}
+	return filepath.Join(home, ".config", appName), nil
+}
+
+func targetPath(goos string, elements ...string) string {
+	if goos != "windows" {
+		return filepath.Join(elements...)
+	}
+
+	joined := strings.Join(elements, `\`)
+	for strings.Contains(joined, `\\`) {
+		joined = strings.ReplaceAll(joined, `\\`, `\`)
+	}
+	return joined
+}
+
+func posixPath(path string) string {
+	return strings.ReplaceAll(path, `\`, "/")
+}
+
+// Install adds or updates a marker block in rcFile that sources installLines.
 // If a marker block already exists, it is replaced.
-func Install(rcFile string, sourcePath string) error {
-	sourceLine := fmt.Sprintf("source \"%s\"", sourcePath)
-	block := markerStart + "\n" + sourceLine + "\n" + markerEnd + "\n"
+func Install(rcFile string, installLines []string) error {
+	block := markerStart + "\n" + strings.Join(installLines, "\n") + "\n" + markerEnd + "\n"
+	if err := os.MkdirAll(filepath.Dir(rcFile), 0o755); err != nil {
+		return fmt.Errorf("creating rc directory %s: %w", filepath.Dir(rcFile), err)
+	}
 
 	var existing string
 	if data, err := os.ReadFile(rcFile); err == nil {

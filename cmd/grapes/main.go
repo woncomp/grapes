@@ -6,11 +6,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/woncomp/grapes/fragments"
 	"github.com/woncomp/grapes/parser"
 	"github.com/woncomp/grapes/preprocessor"
+	"github.com/woncomp/grapes/renderer"
 	"github.com/woncomp/grapes/resolver"
 	"github.com/woncomp/grapes/shells"
 	"github.com/woncomp/grapes/writer"
@@ -125,10 +127,26 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  -h, --help           Show help")
 }
 
+func managedOutputDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
+	if goos == "windows" {
+		appData, ok := lookupEnv("APPDATA")
+		if !ok || strings.TrimSpace(appData) == "" {
+			return "", fmt.Errorf("APPDATA environment variable not set")
+		}
+		return filepath.Join(appData, "grapes"), nil
+	}
+
+	home, ok := lookupEnv("HOME")
+	if !ok || strings.TrimSpace(home) == "" {
+		return "", fmt.Errorf("HOME environment variable not set")
+	}
+	return filepath.Join(home, ".config", "grapes"), nil
+}
+
 func run(masterPath string, targets []shells.Shell, noLink bool) error {
-	home := os.Getenv("HOME")
-	if home == "" {
-		return fmt.Errorf("HOME environment variable not set")
+	outputDir, err := managedOutputDir(runtime.GOOS, os.LookupEnv)
+	if err != nil {
+		return err
 	}
 
 	master, err := parser.ParseFile(masterPath)
@@ -155,8 +173,6 @@ func run(masterPath string, targets []shells.Shell, noLink bool) error {
 		return err
 	}
 
-	outputDir := filepath.Join(home, ".config", "grapes")
-
 	var outputs []writer.OutputFile
 	for _, target := range targets {
 		for _, phase := range outputPhases {
@@ -166,7 +182,12 @@ func run(masterPath string, targets []shells.Shell, noLink bool) error {
 					if block.Phase != phase {
 						continue
 					}
-					content, err := preprocessor.Process(block.Body, target.Name())
+					rendered, err := renderer.RenderBlock(runtime.GOOS, target.Name(), block.Env, block.Paths, block.Body)
+					if err != nil {
+						return fmt.Errorf("rendering %s for %s: %w", f.Name, target.Name(), err)
+					}
+
+					content, err := preprocessor.Process(rendered, target.Name())
 					if err != nil {
 						return fmt.Errorf("preprocessing %s for %s: %w", f.Name, target.Name(), err)
 					}
@@ -197,9 +218,19 @@ func run(masterPath string, targets []shells.Shell, noLink bool) error {
 		return nil
 	}
 
+	ctx := shells.TargetContext{
+		GOOS:      runtime.GOOS,
+		LookupEnv: os.LookupEnv,
+		OutputDir: outputDir,
+	}
+
 	for _, target := range targets {
-		for _, link := range target.LinkTargets(home, outputDir) {
-			if err := shells.Install(link.RCFile, link.SourcePath); err != nil {
+		links, err := target.LinkTargets(ctx)
+		if err != nil {
+			return fmt.Errorf("resolving link targets for %s: %w", target.Name(), err)
+		}
+		for _, link := range links {
+			if err := shells.Install(link.RCFile, link.InstallLines); err != nil {
 				return fmt.Errorf("installing source in %s: %w", link.RCFile, err)
 			}
 			fmt.Printf("Installed source in %s\n", link.RCFile)

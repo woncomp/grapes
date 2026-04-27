@@ -6,7 +6,14 @@ import (
 )
 
 func shellLine(shell string) string {
-	return `export __GRAPES_SHELL="` + shell + `"` + "\n"
+	switch shell {
+	case "nushell":
+		return `$env.__GRAPES_SHELL = "` + shell + `"` + "\n"
+	case "powershell":
+		return `$env:__GRAPES_SHELL = "` + shell + `"` + "\n"
+	default:
+		return `export __GRAPES_SHELL="` + shell + `"` + "\n"
+	}
 }
 
 func TestNoDirectives(t *testing.T) {
@@ -22,13 +29,13 @@ func TestNoDirectives(t *testing.T) {
 }
 
 func TestShellInjection(t *testing.T) {
-	for _, shell := range []string{"bash", "zsh"} {
+	for _, shell := range []string{"bash", "zsh", "nushell", "powershell"} {
 		result, err := Process("echo hi\n", shell)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(result, `__GRAPES_SHELL="`+shell+`"`) {
-			t.Errorf("output should contain __GRAPES_SHELL=%q, got: %q", shell, result)
+		if !strings.HasPrefix(result, shellLine(shell)) {
+			t.Errorf("output should start with shell-native injection %q, got: %q", shellLine(shell), result)
 		}
 	}
 }
@@ -115,6 +122,34 @@ func TestElif(t *testing.T) {
 	}
 	if result != shellLine("zsh")+"echo zsh\n" {
 		t.Errorf("zsh: got %q", result)
+	}
+}
+
+func TestIfdefPowerShellAndNushell(t *testing.T) {
+	input := "#ifdef NUSHELL\necho nu\n#elif POWERSHELL\necho pwsh\n#else\necho other\n#endif\n"
+
+	result, err := Process(input, "powershell")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := shellLine("powershell") + "echo pwsh\n"
+	if result != expected {
+		t.Fatalf("got %q, want %q", result, expected)
+	}
+}
+
+func TestIfdefNushellAndPowerShell(t *testing.T) {
+	input := "#ifdef NUSHELL\necho nu\n#elif POWERSHELL\necho pwsh\n#else\necho other\n#endif\n"
+
+	result, err := Process(input, "nushell")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := shellLine("nushell") + "echo nu\n"
+	if result != expected {
+		t.Fatalf("got %q, want %q", result, expected)
 	}
 }
 

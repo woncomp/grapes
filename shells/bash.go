@@ -1,6 +1,7 @@
 package shells
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -28,17 +29,26 @@ func (bashShell) ManagedFilename(phase string) string {
 	}
 }
 
-func (b bashShell) LinkTargets(home, outputDir string) []LinkTarget {
+func (b bashShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
+	home, err := homeDir(ctx.GOOS, ctx.LookupEnv)
+	if err != nil {
+		return nil, err
+	}
+
 	return []LinkTarget{
 		{
-			RCFile:     detectBashEnvTarget(home),
-			SourcePath: filepath.Join(outputDir, b.ManagedFilename(PhaseEnv)),
+			RCFile: detectBashEnvTarget(home),
+			InstallLines: []string{
+				fmt.Sprintf(`source "%s"`, posixPath(filepath.Join(ctx.OutputDir, b.ManagedFilename(PhaseEnv)))),
+			},
 		},
 		{
-			RCFile:     filepath.Join(home, ".bashrc"),
-			SourcePath: filepath.Join(outputDir, b.ManagedFilename(PhaseMain)),
+			RCFile: filepath.Join(home, ".bashrc"),
+			InstallLines: []string{
+				fmt.Sprintf(`source "%s"`, posixPath(filepath.Join(ctx.OutputDir, b.ManagedFilename(PhaseMain)))),
+			},
 		},
-	}
+	}, nil
 }
 
 func detectBashEnvTarget(homeDir string) string {

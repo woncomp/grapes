@@ -1,10 +1,23 @@
 ---
 phase: env
-paths:
-  - $HOME/.local/bin
 ---
+#ifdef BASH
+export PATH="$HOME/.local/bin:$PATH"
+#elif ZSH
+export PATH="$HOME/.local/bin:$PATH"
+#elif NUSHELL
+$env.PATH = ($env.PATH | prepend ($env.HOME | path join ".local" "bin"))
+#elif POWERSHELL
+$env:PATH = (Join-Path (Join-Path $HOME ".local") "bin") + [System.IO.Path]::PathSeparator + $env:PATH
+#endif
 
 ---
 phase: main
 ---
-eval "$(uv generate-shell-completion $__GRAPES_SHELL)"
+#ifdef BASH
+eval "$(uv generate-shell-completion bash)"
+#elif ZSH
+eval "$(uv generate-shell-completion zsh)"
+#elif POWERSHELL
+uv generate-shell-completion powershell | Out-String | Invoke-Expression
+#endif
