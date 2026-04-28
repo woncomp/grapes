@@ -1,5 +1,7 @@
 # grapes
 
+<img width="160" height="160" alt="grapes" src="https://github.com/user-attachments/assets/c5f3908b-d12e-431a-8432-1746f968d411" />
+
 ## Overview
 
 `grapes` is a project for managing terminal environments in a more structured way. It is designed to make shell configuration easier to organize, easier to migrate between machines, and easier to keep consistent across multiple shells.
