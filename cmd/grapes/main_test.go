@@ -58,6 +58,54 @@ func TestParseArgsSupportsYesShortFlag(t *testing.T) {
 	if !opts.assumeYes {
 		t.Fatal("assumeYes = false, want true")
 	}
+	if got, want := opts.dependencyMode, dependencyModeSafe; got != want {
+		t.Fatalf("dependencyMode = %q, want %q", got, want)
+	}
+}
+
+func TestParseArgsSupportsDependencyMode(t *testing.T) {
+	opts, err := parseArgs([]string{"master.grapes", "--dependency-mode=allow-warnings"}, func(key string) (string, bool) {
+		if key == "SHELL" {
+			return "/bin/zsh", true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := opts.dependencyMode, dependencyModeAllowWarnings; got != want {
+		t.Fatalf("dependencyMode = %q, want %q", got, want)
+	}
+}
+
+func TestParseArgsRejectsInvalidDependencyMode(t *testing.T) {
+	_, err := parseArgs([]string{"master.grapes", "--dependency-mode=weird"}, func(key string) (string, bool) {
+		if key == "SHELL" {
+			return "/bin/zsh", true
+		}
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid value for --dependency-mode") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsRejectsYesWithConflictingDependencyMode(t *testing.T) {
+	_, err := parseArgs([]string{"master.grapes", "--yes", "--dependency-mode=fail"}, func(key string) (string, bool) {
+		if key == "SHELL" {
+			return "/bin/zsh", true
+		}
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--yes") || !strings.Contains(err.Error(), "--dependency-mode") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func TestParseArgsUsesExplicitTargetAlias(t *testing.T) {
@@ -131,8 +179,11 @@ func TestPrintUsageUsesNewCommandShape(t *testing.T) {
 	printUsage(&buf)
 
 	usage := buf.String()
-	if !strings.Contains(usage, "Usage: grapes <input> [-t shell]... [--yes] [--nolink]") {
+	if !strings.Contains(usage, "Usage: grapes <input> [-t shell]... [--dependency-mode mode] [--yes] [--nolink]") {
 		t.Fatalf("usage did not contain review command shape: %s", usage)
+	}
+	if !strings.Contains(usage, "--dependency-mode") {
+		t.Fatalf("usage did not document --dependency-mode: %s", usage)
 	}
 	if !strings.Contains(usage, "-y, --yes") {
 		t.Fatalf("usage did not document --yes: %s", usage)
@@ -669,6 +720,154 @@ echo warn-fragment
 
 	outputDir := expectedRunOutputDir(t, home, appData)
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "warn-fragment")
+}
+
+func TestRunDependencyChecksDependencyModeSafeSkipsWarnings(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - warn
+---
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:     masterPath,
+		targets:        []shells.Shell{target},
+		lookupEnv:      os.LookupEnv,
+		goos:           runtime.GOOS,
+		stdin:          strings.NewReader(""),
+		stdout:         &bytes.Buffer{},
+		interactive:    false,
+		dependencyMode: dependencyModeSafe,
+		noLink:         true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	assertFileExcludes(t, content, "warn-fragment")
+}
+
+func TestRunDependencyChecksDependencyModeAllowWarningsRendersWarnings(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - warn
+---
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:     masterPath,
+		targets:        []shells.Shell{target},
+		lookupEnv:      os.LookupEnv,
+		goos:           runtime.GOOS,
+		stdin:          strings.NewReader(""),
+		stdout:         &bytes.Buffer{},
+		interactive:    false,
+		dependencyMode: dependencyModeAllowWarnings,
+		noLink:         true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "warn-fragment")
+}
+
+func TestRunDependencyChecksDependencyModeFailExitsOnWarnings(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - warn
+---
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	err := runWithOptions(runOptions{
+		masterPath:     masterPath,
+		targets:        []shells.Shell{target},
+		lookupEnv:      os.LookupEnv,
+		goos:           runtime.GOOS,
+		stdin:          strings.NewReader(""),
+		stdout:         &bytes.Buffer{},
+		interactive:    false,
+		dependencyMode: dependencyModeFail,
+		noLink:         true,
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "dependency check failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileMissing(t, filepath.Join(outputDir, "bashrc"))
 }
 
 func TestRunDependencyChecksYesSkipsWarnings(t *testing.T) {

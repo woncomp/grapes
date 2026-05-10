@@ -23,24 +23,35 @@ var (
 	outputPhases     = []string{shells.PhaseEnv, shells.PhaseMain}
 )
 
+type dependencyMode string
+
+const (
+	dependencyModePrompt        dependencyMode = "prompt"
+	dependencyModeSafe          dependencyMode = "safe"
+	dependencyModeAllowWarnings dependencyMode = "allow-warnings"
+	dependencyModeFail          dependencyMode = "fail"
+)
+
 type cliOptions struct {
-	masterPath string
-	targets    []shells.Shell
-	assumeYes  bool
-	noLink     bool
+	masterPath     string
+	targets        []shells.Shell
+	assumeYes      bool
+	dependencyMode dependencyMode
+	noLink         bool
 }
 
 type runOptions struct {
-	masterPath  string
-	targets     []shells.Shell
-	assumeYes   bool
-	noLink      bool
-	lookupEnv   func(string) (string, bool)
-	goos        string
-	stdin       io.Reader
-	stdout      io.Writer
-	interactive bool
-	color       bool
+	masterPath     string
+	targets        []shells.Shell
+	assumeYes      bool
+	dependencyMode dependencyMode
+	noLink         bool
+	lookupEnv      func(string) (string, bool)
+	goos           string
+	stdin          io.Reader
+	stdout         io.Writer
+	interactive    bool
+	color          bool
 }
 
 func main() {
@@ -57,16 +68,17 @@ func main() {
 	}
 
 	if err := runWithOptions(runOptions{
-		masterPath:  opts.masterPath,
-		targets:     opts.targets,
-		assumeYes:   opts.assumeYes,
-		noLink:      opts.noLink,
-		lookupEnv:   os.LookupEnv,
-		goos:        runtime.GOOS,
-		stdin:       os.Stdin,
-		stdout:      os.Stdout,
-		interactive: isCharDevice(os.Stdin) && isCharDevice(os.Stdout),
-		color:       isCharDevice(os.Stdout),
+		masterPath:     opts.masterPath,
+		targets:        opts.targets,
+		assumeYes:      opts.assumeYes,
+		dependencyMode: opts.dependencyMode,
+		noLink:         opts.noLink,
+		lookupEnv:      os.LookupEnv,
+		goos:           runtime.GOOS,
+		stdin:          os.Stdin,
+		stdout:         os.Stdout,
+		interactive:    isCharDevice(os.Stdin) && isCharDevice(os.Stdout),
+		color:          isCharDevice(os.Stdout),
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -74,7 +86,7 @@ func main() {
 }
 
 func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions, error) {
-	var opts cliOptions
+	opts := cliOptions{dependencyMode: dependencyModePrompt}
 	seenTargets := make(map[string]bool)
 
 	for i := 0; i < len(args); i++ {
@@ -85,6 +97,13 @@ func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions
 			return cliOptions{}, errHelpRequested
 		case arg == "-y" || arg == "--yes":
 			opts.assumeYes = true
+			opts.dependencyMode = dependencyModeSafe
+		case strings.HasPrefix(arg, "--dependency-mode="):
+			mode, err := parseDependencyMode(strings.TrimPrefix(arg, "--dependency-mode="))
+			if err != nil {
+				return cliOptions{}, err
+			}
+			opts.dependencyMode = mode
 		case arg == "--nolink":
 			opts.noLink = true
 		case arg == "-t" || arg == "--target":
@@ -116,6 +135,9 @@ func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions
 	if opts.masterPath == "" {
 		return cliOptions{}, fmt.Errorf("missing input file")
 	}
+	if opts.assumeYes && opts.dependencyMode != dependencyModeSafe {
+		return cliOptions{}, fmt.Errorf("--yes conflicts with --dependency-mode=%s", opts.dependencyMode)
+	}
 
 	if len(opts.targets) == 0 {
 		target, err := shells.DetectCurrent(lookupEnv)
@@ -144,13 +166,14 @@ func addTarget(targets *[]shells.Shell, seen map[string]bool, raw string) error 
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--yes] [--nolink]")
+	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--dependency-mode mode] [--yes] [--nolink]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Generate shell rc files from .grape fragments.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  -t, --target shell   Target shell to generate and link (repeatable; default: current shell)")
-	fmt.Fprintln(w, "  -y, --yes            Approve all shell rc/profile changes without prompting")
+	fmt.Fprintln(w, "      --dependency-mode mode  Dependency handling mode: prompt, safe, allow-warnings, fail")
+	fmt.Fprintln(w, "  -y, --yes            Approve dependency review in safe mode and skip shell link prompts")
 	fmt.Fprintln(w, "      --nolink         Generate managed rc files only; do not link user rc files")
 	fmt.Fprintln(w, "  -h, --help           Show help")
 }
@@ -173,16 +196,27 @@ func managedOutputDir(goos string, lookupEnv func(string) (string, bool)) (strin
 
 func run(masterPath string, targets []shells.Shell, noLink bool) error {
 	return runWithOptions(runOptions{
-		masterPath:  masterPath,
-		targets:     targets,
-		noLink:      noLink,
-		lookupEnv:   os.LookupEnv,
-		goos:        runtime.GOOS,
-		stdin:       os.Stdin,
-		stdout:      os.Stdout,
-		interactive: isCharDevice(os.Stdin) && isCharDevice(os.Stdout),
-		color:       isCharDevice(os.Stdout),
+		masterPath:     masterPath,
+		targets:        targets,
+		dependencyMode: dependencyModePrompt,
+		noLink:         noLink,
+		lookupEnv:      os.LookupEnv,
+		goos:           runtime.GOOS,
+		stdin:          os.Stdin,
+		stdout:         os.Stdout,
+		interactive:    isCharDevice(os.Stdin) && isCharDevice(os.Stdout),
+		color:          isCharDevice(os.Stdout),
 	})
+}
+
+func parseDependencyMode(raw string) (dependencyMode, error) {
+	mode := dependencyMode(strings.TrimSpace(raw))
+	switch mode {
+	case dependencyModePrompt, dependencyModeSafe, dependencyModeAllowWarnings, dependencyModeFail:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("invalid value for --dependency-mode: %s", raw)
+	}
 }
 
 func runWithOptions(opts runOptions) error {
@@ -193,6 +227,10 @@ func runWithOptions(opts runOptions) error {
 	stdout := opts.stdout
 	if stdout == nil {
 		stdout = io.Discard
+	}
+
+	if opts.dependencyMode == "" {
+		opts.dependencyMode = dependencyModePrompt
 	}
 
 	outputDir, err := managedOutputDir(opts.goos, lookupEnv)
@@ -236,8 +274,9 @@ func runWithOptions(opts runOptions) error {
 		color:       opts.color,
 		assumeYes:   opts.assumeYes,
 	}
-	fmt.Fprint(stdout, renderDependencyTable(dependencyResults, false))
-	action, err := ui.chooseDependencyAction(dependencyResults)
+	allowWarnings := opts.dependencyMode == dependencyModeAllowWarnings
+	fmt.Fprint(stdout, renderDependencyTable(dependencyResults, allowWarnings))
+	action, err := ui.chooseDependencyAction(opts.dependencyMode, dependencyResults)
 	if err != nil {
 		return err
 	}

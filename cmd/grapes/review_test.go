@@ -89,12 +89,36 @@ func TestReviewShellFailsWhenPromptingNonInteractive(t *testing.T) {
 func TestDependencyPromptAssumeYesUsesSafeMode(t *testing.T) {
 	ui := reviewUI{assumeYes: true, stdout: &bytes.Buffer{}}
 
-	decision, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusWarning}})
+	decision, err := ui.chooseDependencyAction(dependencyModePrompt, []grapeDependencyResult{{Status: dependencyStatusWarning}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got, want := decision, dependencyActionSafe; got != want {
 		t.Fatalf("decision = %q, want %q", got, want)
+	}
+}
+
+func TestDependencyPromptSafeModeSkipsPrompt(t *testing.T) {
+	ui := reviewUI{stdout: &bytes.Buffer{}}
+
+	decision, err := ui.chooseDependencyAction(dependencyModeSafe, []grapeDependencyResult{{Status: dependencyStatusWarning}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := decision, dependencyActionSafe; got != want {
+		t.Fatalf("decision = %q, want %q", got, want)
+	}
+}
+
+func TestDependencyPromptFailModeReturnsErrorOnIssues(t *testing.T) {
+	ui := reviewUI{stdout: &bytes.Buffer{}}
+
+	_, err := ui.chooseDependencyAction(dependencyModeFail, []grapeDependencyResult{{Status: dependencyStatusWarning}, {Status: dependencyStatusFailed}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "dependency check failed") || !strings.Contains(err.Error(), "1 warning") || !strings.Contains(err.Error(), "1 failed") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -106,7 +130,7 @@ func TestDependencyPromptSupportsIgnoreWarnings(t *testing.T) {
 		interactive: true,
 	}
 
-	decision, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusWarning}})
+	decision, err := ui.chooseDependencyAction(dependencyModePrompt, []grapeDependencyResult{{Status: dependencyStatusWarning}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +149,7 @@ func TestDependencyPromptWithoutWarningsUsesYesNo(t *testing.T) {
 		interactive: true,
 	}
 
-	decision, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusOK}})
+	decision, err := ui.chooseDependencyAction(dependencyModePrompt, []grapeDependencyResult{{Status: dependencyStatusOK}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,11 +161,11 @@ func TestDependencyPromptWithoutWarningsUsesYesNo(t *testing.T) {
 func TestDependencyPromptFailsWhenNonInteractiveWithoutYes(t *testing.T) {
 	ui := reviewUI{stdin: strings.NewReader(""), stdout: &bytes.Buffer{}, interactive: false}
 
-	_, err := ui.chooseDependencyAction([]grapeDependencyResult{{Status: dependencyStatusWarning}})
+	_, err := ui.chooseDependencyAction(dependencyModePrompt, []grapeDependencyResult{{Status: dependencyStatusWarning}})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "--yes") {
+	if !strings.Contains(err.Error(), "--yes") || !strings.Contains(err.Error(), "--dependency-mode") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -112,16 +112,69 @@ func (ui *reviewUI) reviewShell(plan shellLinkPlan) (bool, error) {
 	}
 }
 
-func (ui *reviewUI) chooseDependencyAction(results []grapeDependencyResult) (dependencyAction, error) {
+func dependencyActionForMode(mode dependencyMode, results []grapeDependencyResult) (dependencyAction, error) {
+	hasIssues := false
+	hasWarnings := false
+	for _, result := range results {
+		switch result.Status {
+		case dependencyStatusWarning:
+			hasWarnings = true
+			hasIssues = true
+		case dependencyStatusFailed:
+			hasIssues = true
+		}
+	}
+
+	if mode == "" {
+		mode = dependencyModePrompt
+	}
+
+	switch mode {
+	case dependencyModeSafe:
+		return dependencyActionSafe, nil
+	case dependencyModeAllowWarnings:
+		return dependencyActionAllowWarnings, nil
+	case dependencyModeFail:
+		if hasIssues {
+			warningCount, failedCount := dependencyIssueCounts(results)
+			return dependencyActionCancel, fmt.Errorf("dependency check failed: %d warning, %d failed", warningCount, failedCount)
+		}
+		return dependencyActionSafe, nil
+	case dependencyModePrompt:
+		return dependencyActionCancel, nil
+	default:
+		if hasWarnings {
+			_ = hasWarnings
+		}
+		return dependencyActionCancel, fmt.Errorf("unknown dependency mode: %s", mode)
+	}
+}
+
+func dependencyIssueCounts(results []grapeDependencyResult) (warningCount, failedCount int) {
+	for _, result := range results {
+		switch result.Status {
+		case dependencyStatusWarning:
+			warningCount++
+		case dependencyStatusFailed:
+			failedCount++
+		}
+	}
+	return warningCount, failedCount
+}
+
+func (ui *reviewUI) chooseDependencyAction(mode dependencyMode, results []grapeDependencyResult) (dependencyAction, error) {
 	stdout := ui.stdout
 	if stdout == nil {
 		stdout = io.Discard
+	}
+	if mode != dependencyModePrompt {
+		return dependencyActionForMode(mode, results)
 	}
 	if ui.assumeYes {
 		return dependencyActionSafe, nil
 	}
 	if !ui.interactive {
-		return dependencyActionCancel, fmt.Errorf("dependency review requires an interactive terminal; rerun with --yes to continue without prompting")
+		return dependencyActionCancel, fmt.Errorf("dependency review requires an interactive terminal; rerun with --yes or --dependency-mode to continue without prompting")
 	}
 
 	hasWarnings := false
