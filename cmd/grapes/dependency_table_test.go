@@ -10,8 +10,8 @@ import (
 func TestDependencyTableRendersSummaryAndDetails(t *testing.T) {
 	results := []grapeDependencyResult{
 		{Grape: &parser.GrapeFile{Name: "plain"}, Dependency: "n/a", Status: dependencyStatusOK, Location: "n/a", Version: "n/a"},
-		{Grape: &parser.GrapeFile{Name: "zoxide"}, Dependency: "zoxide", Status: dependencyStatusWarning, Location: "/usr/bin/zoxide", Version: "unknown", Detail: "version output did not match version_regex"},
-		{Grape: &parser.GrapeFile{Name: "fzf"}, Dependency: "fzf", Status: dependencyStatusFailed, Location: "not found", Version: "n/a", Detail: "not installed"},
+		{Grape: &parser.GrapeFile{Name: "zoxide"}, Dependency: "executable:zoxide", Status: dependencyStatusWarning, Location: "/usr/bin/zoxide", Version: "unknown", Detail: "version output did not match version_regex"},
+		{Grape: &parser.GrapeFile{Name: "nvm"}, Dependency: "file", Status: dependencyStatusFailed, Location: "not found", Version: "n/a", Detail: "not installed"},
 	}
 
 	text := renderDependencyTable(results, false)
@@ -30,6 +30,8 @@ func TestDependencyTableRendersSummaryAndDetails(t *testing.T) {
 		"not found",
 		"version output did not match version_regex",
 		"not installed",
+		"executable:zoxide",
+		"file",
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("table = %q, want fragment %q", text, fragment)
@@ -43,7 +45,7 @@ func TestDependencyTableRendersSummaryAndDetails(t *testing.T) {
 func TestDependencyTableMarksWarningsRenderableWhenIgnoringWarnings(t *testing.T) {
 	results := []grapeDependencyResult{{
 		Grape:      &parser.GrapeFile{Name: "zoxide"},
-		Dependency: "zoxide",
+		Dependency: "executable:zoxide",
 		Status:     dependencyStatusWarning,
 		Location:   "/usr/bin/zoxide",
 		Version:    "unknown",

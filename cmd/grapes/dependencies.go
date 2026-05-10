@@ -77,7 +77,7 @@ func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) 
 	if grape.DependExecutable == nil && grape.DependFile == nil {
 		return grapeDependencyResult{
 			Grape:      grape,
-			Dependency: "n/a",
+			Dependency: dependencyLabel(grape),
 			Status:     dependencyStatusOK,
 			Location:   "n/a",
 			Version:    "n/a",
@@ -92,7 +92,7 @@ func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) 
 	if !ok {
 		return grapeDependencyResult{
 			Grape:      grape,
-			Dependency: dep.Binary,
+			Dependency: dependencyLabel(grape),
 			Status:     dependencyStatusFailed,
 			Location:   "not found",
 			Version:    "n/a",
@@ -102,7 +102,7 @@ func checkGrapeDependency(grape *parser.GrapeFile, opts dependencyCheckOptions) 
 
 	result := grapeDependencyResult{
 		Grape:      grape,
-		Dependency: dep.Binary,
+		Dependency: dependencyLabel(grape),
 		Status:     dependencyStatusOK,
 		Location:   path,
 		Version:    "n/a",
@@ -136,7 +136,7 @@ func checkGrapeFileDependency(grape *parser.GrapeFile, opts dependencyCheckOptio
 	if len(matches) == 0 {
 		return grapeDependencyResult{
 			Grape:      grape,
-			Dependency: "file",
+			Dependency: dependencyLabel(grape),
 			Status:     dependencyStatusFailed,
 			Location:   "not found",
 			Version:    "n/a",
@@ -145,7 +145,7 @@ func checkGrapeFileDependency(grape *parser.GrapeFile, opts dependencyCheckOptio
 	}
 	return grapeDependencyResult{
 		Grape:      grape,
-		Dependency: "file",
+		Dependency: dependencyLabel(grape),
 		Status:     dependencyStatusOK,
 		Location:   matches[0],
 		Version:    "n/a",
@@ -173,7 +173,7 @@ func findExecutable(dep *parser.DependExecutable, opts dependencyCheckOptions) (
 				return candidate, true
 			}
 		}
-		}
+	}
 	return "", false
 }
 
@@ -187,20 +187,44 @@ func candidateExecutableNames(binary, goos string) []string {
 	return []string{binary, binary + ".exe", binary + ".cmd", binary + ".bat", binary + ".com"}
 }
 
+func dependencyLabel(grape *parser.GrapeFile) string {
+	switch {
+	case grape.DependExecutable != nil:
+		return "executable:" + grape.DependExecutable.Binary
+	case grape.DependFile != nil:
+		return "file"
+	default:
+		return "n/a"
+	}
+}
+
 func commonExecutableSearchPaths(lookupEnv func(string) (string, bool), goos string) []string {
 	if goos == "windows" {
 		var paths []string
 		if localAppData, ok := lookupEnv("LOCALAPPDATA"); ok && strings.TrimSpace(localAppData) != "" {
-			paths = append(paths, filepath.Join(localAppData, "Microsoft", "WinGet", "Links"))
+			paths = append(paths,
+				filepath.Join(localAppData, "Microsoft", "WinGet", "Links"),
+				filepath.Join(localAppData, "Programs"),
+			)
 		}
 		if userProfile := effectiveHomeDir(lookupEnv, goos); strings.TrimSpace(userProfile) != "" {
-			paths = append(paths, filepath.Join(userProfile, "scoop", "shims"))
+			paths = append(paths,
+				filepath.Join(userProfile, "scoop", "shims"),
+				filepath.Join(userProfile, ".cargo", "bin"),
+				filepath.Join(userProfile, ".dotnet", "tools"),
+			)
 		}
 		if choco, ok := lookupEnv("ChocolateyInstall"); ok && strings.TrimSpace(choco) != "" {
 			paths = append(paths, filepath.Join(choco, "bin"))
 		}
 		if appData, ok := lookupEnv("APPDATA"); ok && strings.TrimSpace(appData) != "" {
 			paths = append(paths, filepath.Join(appData, "npm"))
+		}
+		if programFiles, ok := lookupEnv("ProgramFiles"); ok && strings.TrimSpace(programFiles) != "" {
+			paths = append(paths, programFiles)
+		}
+		if programFilesX86, ok := lookupEnv("ProgramFiles(x86)"); ok && strings.TrimSpace(programFilesX86) != "" {
+			paths = append(paths, programFilesX86)
 		}
 		return paths
 	}

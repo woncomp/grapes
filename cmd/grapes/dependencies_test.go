@@ -10,6 +10,40 @@ import (
 	"github.com/woncomp/grapes/parser"
 )
 
+func TestDependencyLabelsReflectType(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "nvm.sh")
+	if err := os.WriteFile(file, []byte("echo nvm"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	grapes := []*parser.GrapeFile{
+		{Name: "plain"},
+		{Name: "nvm", DependFile: &parser.DependFile{Paths: []string{file}}},
+		{Name: "zoxide", DependExecutable: &parser.DependExecutable{Binary: "zoxide"}},
+	}
+
+	results, err := checkGrapeDependencies(grapes, dependencyCheckOptions{
+		lookupEnv: func(string) (string, bool) { return "", false },
+		lookPath: func(file string) (string, error) {
+			if file == "zoxide" {
+				return "/usr/bin/zoxide", nil
+			}
+			return "", errors.New("not found")
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := results[0].Dependency, "n/a"; got != want {
+		t.Fatalf("plain dependency = %q, want %q", got, want)
+	}
+	if got, want := results[1].Dependency, "file"; got != want {
+		t.Fatalf("file dependency = %q, want %q", got, want)
+	}
+	if got, want := results[2].Dependency, "executable:zoxide"; got != want {
+		t.Fatalf("executable dependency = %q, want %q", got, want)
+	}
+}
+
 func TestExecutableDependencyCheckPathLookupSuccessWithoutVersion(t *testing.T) {
 	grapes := []*parser.GrapeFile{{
 		Name: "zoxide",
@@ -248,6 +282,11 @@ func TestExecutableDependencyCheckWindowsCommonPathsAndExtensions(t *testing.T) 
 		{name: "scoop shims", envKey: "USERPROFILE", pathSuffix: []string{"scoop", "shims", "bun.exe"}},
 		{name: "chocolatey bin", envKey: "ChocolateyInstall", pathSuffix: []string{"bin", "bun.exe"}},
 		{name: "appdata npm", envKey: "APPDATA", pathSuffix: []string{"npm", "bun.exe"}},
+		{name: "localappdata programs", envKey: "LOCALAPPDATA", pathSuffix: []string{"Programs", "bun.exe"}},
+		{name: "program files", envKey: "ProgramFiles", pathSuffix: []string{"bun.exe"}},
+		{name: "program files x86", envKey: "ProgramFiles(x86)", pathSuffix: []string{"bun.exe"}},
+		{name: "cargo bin", envKey: "USERPROFILE", pathSuffix: []string{".cargo", "bin", "bun.exe"}},
+		{name: "dotnet tools", envKey: "USERPROFILE", pathSuffix: []string{".dotnet", "tools", "bun.exe"}},
 	}
 
 	for _, tc := range cases {
