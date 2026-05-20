@@ -86,6 +86,10 @@ func main() {
 }
 
 func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions, error) {
+	return parseArgsWithShellDetector(args, lookupEnv, shells.DetectCurrent)
+}
+
+func parseArgsWithShellDetector(args []string, lookupEnv func(string) (string, bool), detectShell func(func(string) (string, bool)) (shells.Shell, error)) (cliOptions, error) {
 	opts := cliOptions{dependencyMode: dependencyModePrompt}
 	seenTargets := make(map[string]bool)
 
@@ -140,7 +144,7 @@ func parseArgs(args []string, lookupEnv func(string) (string, bool)) (cliOptions
 	}
 
 	if len(opts.targets) == 0 {
-		target, err := shells.DetectCurrent(lookupEnv)
+		target, err := detectShell(lookupEnv)
 		if err != nil {
 			return cliOptions{}, err
 		}

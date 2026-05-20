@@ -49,9 +49,67 @@ func TestDetectCurrent(t *testing.T) {
 	}
 }
 
-func TestDetectCurrentFailsWithoutShell(t *testing.T) {
-	_, err := DetectCurrent(func(string) (string, bool) {
+func TestDetectCurrentUsesPowerShellProcessAncestor(t *testing.T) {
+	shell, err := detectCurrent(func(string) (string, bool) {
 		return "", false
+	}, func() []string {
+		return []string{`C:\Program Files\PowerShell\7\pwsh.exe`}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := shell.Name(), "powershell"; got != want {
+		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
+	}
+}
+
+func TestDetectCurrentUsesSupportedProcessAncestorThroughGoRun(t *testing.T) {
+	shell, err := detectCurrent(func(string) (string, bool) {
+		return "", false
+	}, func() []string {
+		return []string{"go.exe", "go.exe", "pwsh.exe"}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := shell.Name(), "powershell"; got != want {
+		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
+	}
+}
+
+func TestDetectCurrentUsesSupportedProcessAncestorThroughWindowsGoRun(t *testing.T) {
+	shell, err := detectCurrent(func(string) (string, bool) {
+		return "", false
+	}, func() []string {
+		return []string{"cmd.exe", "go.exe", "pwsh.exe"}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := shell.Name(), "powershell"; got != want {
+		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
+	}
+}
+
+func TestDetectCurrentDoesNotUseShellBehindUnsupportedParent(t *testing.T) {
+	_, err := detectCurrent(func(string) (string, bool) {
+		return "", false
+	}, func() []string {
+		return []string{"cmd.exe", "pwsh.exe"}
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "could not detect current shell") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDetectCurrentFailsWithoutShell(t *testing.T) {
+	_, err := detectCurrent(func(string) (string, bool) {
+		return "", false
+	}, func() []string {
+		return nil
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

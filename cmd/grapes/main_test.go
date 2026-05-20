@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -151,8 +152,10 @@ func TestParseArgsDefaultsToDetectedShell(t *testing.T) {
 }
 
 func TestParseArgsFailsWithoutDetectableShell(t *testing.T) {
-	_, err := parseArgs([]string{"master.grapes"}, func(string) (string, bool) {
+	_, err := parseArgsWithShellDetector([]string{"master.grapes"}, func(string) (string, bool) {
 		return "", false
+	}, func(func(string) (string, bool)) (shells.Shell, error) {
+		return nil, errors.New("could not detect current shell")
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

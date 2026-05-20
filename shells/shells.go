@@ -63,18 +63,71 @@ func Parse(raw string) (Shell, error) {
 }
 
 func DetectCurrent(lookupEnv func(string) (string, bool)) (Shell, error) {
+	return detectCurrent(lookupEnv, processAncestorNames)
+}
+
+func detectCurrent(lookupEnv func(string) (string, bool), processAncestors func() []string) (Shell, error) {
 	shellPath, ok := lookupEnv("SHELL")
-	if !ok || strings.TrimSpace(shellPath) == "" {
-		return nil, fmt.Errorf("could not detect current shell; pass -t with one of: %s", strings.Join(SupportedNames(), ", "))
+	if ok && strings.TrimSpace(shellPath) != "" {
+		detected := shellNameFromPath(shellPath)
+		shell, err := Parse(detected)
+		if err != nil {
+			return nil, fmt.Errorf("could not use detected shell %q; pass -t with one of: %s", detected, strings.Join(SupportedNames(), ", "))
+		}
+
+		return shell, nil
 	}
 
-	detected := strings.TrimPrefix(filepath.Base(shellPath), "-")
-	shell, err := Parse(detected)
-	if err != nil {
-		return nil, fmt.Errorf("could not use detected shell %q; pass -t with one of: %s", detected, strings.Join(SupportedNames(), ", "))
+	if processAncestors != nil {
+		if shell, ok := shellFromProcessAncestors(processAncestors()); ok {
+			return shell, nil
+		}
 	}
 
-	return shell, nil
+	return nil, fmt.Errorf("could not detect current shell; pass -t with one of: %s", strings.Join(SupportedNames(), ", "))
+}
+
+func shellFromProcessAncestors(ancestors []string) (Shell, bool) {
+	if len(ancestors) == 0 {
+		return nil, false
+	}
+
+	parent := shellNameFromPath(ancestors[0])
+	if shell, err := Parse(parent); err == nil {
+		return shell, true
+	}
+
+	switch {
+	case parent == "go":
+		return shellAfterGoWrappers(ancestors[1:])
+	case parent == "cmd" && len(ancestors) >= 2 && shellNameFromPath(ancestors[1]) == "go":
+		return shellAfterGoWrappers(ancestors[2:])
+	default:
+		return nil, false
+	}
+}
+
+func shellAfterGoWrappers(ancestors []string) (Shell, bool) {
+	for len(ancestors) > 0 && shellNameFromPath(ancestors[0]) == "go" {
+		ancestors = ancestors[1:]
+	}
+	if len(ancestors) == 0 {
+		return nil, false
+	}
+	shell, err := Parse(shellNameFromPath(ancestors[0]))
+	return shell, err == nil
+}
+
+func shellNameFromPath(raw string) string {
+	name := strings.TrimSpace(raw)
+	if index := strings.LastIndexAny(name, `\/`); index >= 0 {
+		name = name[index+1:]
+	}
+	name = strings.TrimPrefix(name, "-")
+	if strings.EqualFold(filepath.Ext(name), ".exe") {
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+	return name
 }
 
 func homeDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
