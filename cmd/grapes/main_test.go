@@ -460,6 +460,7 @@ imports:
 	assertLineContainsFragments(t, mainContent, "parse", "export {key}=")
 	assertLineContainsFragments(t, mainContent, "load-env")
 	assertLineContainsFragments(t, mainContent, "FNM_MULTISHELL_PATH", "prepend")
+	assertFileExcludes(t, mainContent, "FNM_PATH")
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertFileExcludes(t, combined, "generate-shell-completion nushell")
@@ -522,6 +523,7 @@ imports:
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertLineContainsFragments(t, mainContent, "fnm env", "Invoke-Expression")
+	assertFileExcludes(t, mainContent, "FNM_PATH")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
 	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "zoxide init powershell")
 }

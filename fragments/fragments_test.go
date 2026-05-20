@@ -108,3 +108,74 @@ func TestEmbeddedBuiltinDependencyConfigs(t *testing.T) {
 		})
 	}
 }
+
+func TestFNMFragmentEnvBootstrapsKnownInstallLocations(t *testing.T) {
+	data, err := FS.ReadFile("fnm.grape")
+	if err != nil {
+		t.Fatal(err)
+	}
+	frag, err := parser.ParseGrapeString("fnm", string(data), "<embedded:fnm>")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	envBody := fragmentBlockBody(t, frag, "env")
+	for _, want := range []string{
+		"FNM_PATH",
+		"$HOME/.fnm",
+		"$XDG_DATA_HOME/fnm",
+		"$HOME/Library/Application Support/fnm",
+		"/opt/homebrew/opt/fnm/bin",
+		"/usr/local/opt/fnm/bin",
+		"$HOME/.local/share/fnm",
+	} {
+		if !strings.Contains(envBody, want) {
+			t.Fatalf("env block did not contain %q; got %q", want, envBody)
+		}
+	}
+}
+
+func TestFNMFragmentUsesUseOnCdInAllMainShells(t *testing.T) {
+	data, err := FS.ReadFile("fnm.grape")
+	if err != nil {
+		t.Fatal(err)
+	}
+	frag, err := parser.ParseGrapeString("fnm", string(data), "<embedded:fnm>")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mainBody := fragmentBlockBody(t, frag, "main")
+	for _, want := range []string{
+		"fnm env --use-on-cd --shell bash",
+		"fnm env --use-on-cd | Out-String | Invoke-Expression",
+		`eval "$(fnm env --use-on-cd)"`,
+	} {
+		if !strings.Contains(mainBody, want) {
+			t.Fatalf("main block did not contain %q; got %q", want, mainBody)
+		}
+	}
+	for _, forbidden := range []string{
+		"FNM_PATH",
+		`export PATH="$FNM_PATH:$PATH"`,
+		"$env:PATH = $env:FNM_PATH",
+		"$env.PATH = ($env.PATH | prepend $env.FNM_PATH)",
+	} {
+		if strings.Contains(mainBody, forbidden) {
+			t.Fatalf("main block unexpectedly contained %q; got %q", forbidden, mainBody)
+		}
+	}
+}
+
+func fragmentBlockBody(t *testing.T, frag *parser.GrapeFile, phase string) string {
+	t.Helper()
+
+	for _, block := range frag.Blocks {
+		if block.Phase == phase {
+			return block.Body
+		}
+	}
+
+	t.Fatalf("phase %q not found", phase)
+	return ""
+}
