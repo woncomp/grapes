@@ -30,3 +30,9 @@ goreleaser release --snapshot --clean
 ```
 
 The repository's `.goreleaser.yml` builds `./cmd/grapes` for `linux`, `darwin`, and `windows` on `amd64` and `arm64`, packaging archives plus a SHA-256 checksum file.
+
+## Fragment authoring guidance
+
+When adding or changing `.grape` fragments, prefer the `env` phase for instructions whose primary purpose is setting environment variables or initializing environment state that later commands depend on. Reserve the `main` phase for interactive shell behavior such as completions, aliases, prompts, and other non-environment startup logic.
+
+When a fragment needs both phases, keep the blocks ordered as `main` first and `env` second. Do not put `env` before `main`.

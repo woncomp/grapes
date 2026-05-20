@@ -1,10 +1,21 @@
 ---
-phase: env
+phase: main
 depend_executable:
   binary: uv
   version_args:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+#ifdef BASH
+eval "$(uv generate-shell-completion bash)"
+#elif ZSH
+eval "$(uv generate-shell-completion zsh)"
+#elif PWSH
+uv generate-shell-completion powershell | Out-String | Invoke-Expression
+#endif
+
+---
+phase: env
 ---
 #ifdef BASH
 export PATH="$HOME/.local/bin:$PATH"
@@ -14,15 +25,4 @@ export PATH="$HOME/.local/bin:$PATH"
 $env.PATH = ($env.PATH | prepend ($env.HOME | path join ".local" "bin"))
 #elif PWSH
 $env:PATH = (Join-Path (Join-Path $HOME ".local") "bin") + [System.IO.Path]::PathSeparator + $env:PATH
-#endif
-
----
-phase: main
----
-#ifdef BASH
-eval "$(uv generate-shell-completion bash)"
-#elif ZSH
-eval "$(uv generate-shell-completion zsh)"
-#elif PWSH
-uv generate-shell-completion powershell | Out-String | Invoke-Expression
 #endif

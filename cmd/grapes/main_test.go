@@ -546,7 +546,7 @@ imports:
 ---
 `)
 	writeTempFile(t, sourceDir, "nvm.grape", `---
-phase: main
+phase: env
 depend_file:
   paths:
     - ~/.nvm/nvm.sh
@@ -569,7 +569,7 @@ echo nvm-fragment
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "nvm-fragment")
+	assertFileContains(t, filepath.Join(outputDir, "bashenv"), "nvm-fragment")
 }
 
 func TestRunDependencyChecksFileDependencySkipsWhenFileMissing(t *testing.T) {
@@ -588,7 +588,7 @@ imports:
 ---
 `)
 	writeTempFile(t, sourceDir, "nvm.grape", `---
-phase: main
+phase: env
 depend_file:
   paths:
     - ~/.nvm/nvm.sh
@@ -611,7 +611,7 @@ echo nvm-fragment
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	content := mustReadFile(t, filepath.Join(outputDir, "bashenv"))
 	assertFileExcludes(t, content, "nvm-fragment")
 }
 
