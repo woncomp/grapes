@@ -1,8 +1,8 @@
-# Grapes: Nushell and PowerShell Support Design
+# Grapes: Nushell and pwsh Support Design
 
 ## Overview
 
-Grapes currently targets `bash` and `zsh`. This design adds first-class support for `nushell` and `PowerShell` while preserving the existing fragment pipeline and the current two-phase model:
+Grapes currently targets `bash` and `zsh`. This design adds first-class support for `nushell` and `pwsh` while preserving the existing fragment pipeline and the current two-phase model:
 
 - `env`
 - `main`
@@ -11,7 +11,7 @@ The goal is to let users generate managed startup files for these shells, link n
 
 ## Goals
 
-- Add `nushell` and `PowerShell` as supported target shells.
+- Add `nushell` and `pwsh` as supported target shells.
 - Keep the existing parse -> resolve -> preprocess -> write -> link flow.
 - Preserve the current fragment model and phase semantics.
 - Support native startup-file linking on Unix-like systems and Windows.
@@ -36,9 +36,9 @@ source "<managed-path>"
 That works for `bash` and `zsh`, but it is not sufficient for the new shells:
 
 - `nushell` needs `source-env` for environment-stage loading and `source` for config-stage loading.
-- `PowerShell` uses dot-sourcing:
+- `pwsh` uses dot-sourcing:
 
-```powershell
+```pwsh
 . "<managed-path>"
 ```
 
@@ -158,12 +158,12 @@ Mapping:
 
 This preserves the meaning of Grapes phases while respecting Nushell's environment propagation rules.
 
-### PowerShell
+### pwsh
 
-PowerShell does not have separate built-in profile files for "env phase" and "main phase" in the same way that `bash`, `zsh`, and `nushell` do. To preserve Grapes's two-phase model without redesigning fragments, Grapes will generate two managed PowerShell files and load both from the user's current-user current-host profile.
+pwsh does not have separate built-in profile files for "env phase" and "main phase" in the same way that `bash`, `zsh`, and `nushell` do. To preserve Grapes's two-phase model without redesigning fragments, Grapes will generate two managed pwsh files and load both from the user's current-user current-host profile.
 
-- `env` -> managed `powershell-env.ps1`
-- `main` -> managed `powershell-profile.ps1`
+- `env` -> managed `pwsh-env.ps1`
+- `main` -> managed `pwsh-profile.ps1`
 
 Native target:
 
@@ -174,7 +174,7 @@ Native target:
 
 Install lines:
 
-```powershell
+```pwsh
 . "<managed-path>"
 ```
 
@@ -183,7 +183,7 @@ Load order inside a single Grapes marker block in the native profile:
 1. dot-source Grapes `env` output
 2. dot-source Grapes `main` output
 
-That preserves phase ordering while fitting naturally into PowerShell's single-profile startup model.
+That preserves phase ordering while fitting naturally into pwsh's single-profile startup model.
 
 ## Managed Output Directory
 
@@ -222,13 +222,13 @@ Shell implementations resolve native target locations using explicit, platform-a
 - On Windows, derive the config directory from `APPDATA` as `%APPDATA%\nushell`.
 - If the required base environment variable is missing, return an explicit error.
 
-### PowerShell path resolution
+### pwsh path resolution
 
 - On Unix-like systems, use `~/.config/powershell/Microsoft.PowerShell_profile.ps1`.
 - On Windows, use `%USERPROFILE%\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`, with `HOME` accepted if it is already set and preferred by the process environment.
 - If both `HOME` and `USERPROFILE` are missing where a home-derived path is required, return an explicit error.
 
-This design intentionally uses the documented default current-user current-host profile location instead of attempting to invoke PowerShell to discover `$PROFILE` dynamically.
+This design intentionally uses the documented default current-user current-host profile location instead of attempting to invoke pwsh to discover `$PROFILE` dynamically.
 
 ## Preprocessor Changes
 
@@ -239,16 +239,16 @@ New supported examples:
 - `#ifdef NUSHELL`
 - `#ifndef NUSHELL`
 - `#elif NUSHELL`
-- `#ifdef POWERSHELL`
-- `#ifndef POWERSHELL`
-- `#elif POWERSHELL`
+- `#ifdef PWSH`
+- `#ifndef PWSH`
+- `#elif PWSH`
 
 `__GRAPES_SHELL` should continue to expose the canonical shell name:
 
 - `bash`
 - `zsh`
 - `nushell`
-- `powershell`
+- `pwsh`
 
 This keeps shell gating simple and consistent with the existing design.
 
@@ -261,14 +261,13 @@ Add the following aliases:
 - Nushell:
   - `nushell`
   - `nu`
-- PowerShell:
-  - `powershell`
+- pwsh:
   - `pwsh`
 
 Canonical names returned by the shell layer remain:
 
 - `nushell`
-- `powershell`
+- `pwsh`
 
 This ensures:
 
@@ -283,7 +282,7 @@ Keep the current conservative behavior:
 - If Grapes can reliably detect the shell from environment input, use it.
 - If not, fail with the existing explicit guidance to pass `-t`.
 
-This feature does not broaden shell auto-detection into heuristic guessing for Windows terminal environments. Users can always select `-t nushell` or `-t powershell` explicitly, and that behavior remains fully supported.
+This feature does not broaden shell auto-detection into heuristic guessing for Windows terminal environments. Users can always select `-t nushell` or `-t pwsh` explicitly, and that behavior remains fully supported.
 
 ## Managed Output Layout
 
@@ -297,8 +296,8 @@ With the new shells included, managed files in the Grapes output directory may n
 ├── zshrc
 ├── nushell-env.nu
 ├── nushell-config.nu
-├── powershell-env.ps1
-└── powershell-profile.ps1
+├── pwsh-env.ps1
+└── pwsh-profile.ps1
 ```
 
 Pruning behavior remains unchanged in spirit: Grapes should delete managed outputs for supported shells that were not selected in the current run.
@@ -347,7 +346,7 @@ The feature should extend the existing package-level test suite rather than intr
 
 ### Shell package tests
 
-- `SupportedNames()` includes `nushell` and `powershell`
+- `SupportedNames()` includes `nushell` and `pwsh`
 - alias parsing works for `nu` and `pwsh`
 - managed filenames map correctly for both phases
 - native target resolution works on Unix-like and Windows inputs
@@ -355,18 +354,18 @@ The feature should extend the existing package-level test suite rather than intr
 - install marker blocks render the correct load syntax:
   - POSIX `source`
   - Nushell `source-env` and `source`
-  - PowerShell ordered dot-sourcing inside one marker block
+  - pwsh ordered dot-sourcing inside one marker block
 - parent-directory creation behavior is covered
 
 ### Preprocessor tests
 
-- `#ifdef NUSHELL` and `#ifdef POWERSHELL` behave correctly
-- `#elif NUSHELL` and `#elif POWERSHELL` behave correctly
-- `__GRAPES_SHELL` is emitted as `nushell` and `powershell`
+- `#ifdef NUSHELL` and `#ifdef PWSH` behave correctly
+- `#elif NUSHELL` and `#elif PWSH` behave correctly
+- `__GRAPES_SHELL` is emitted as `nushell` and `pwsh`
 
 ### CLI tests
 
-- explicit targets accept `nu`, `nushell`, `pwsh`, and `powershell`
+- explicit targets accept `nu`, `nushell`, and `pwsh`
 - duplicate aliases deduplicate to one canonical target
 - unsupported targets still fail cleanly
 
@@ -374,14 +373,14 @@ The feature should extend the existing package-level test suite rather than intr
 
 - `--nolink` writes only the selected new shell outputs
 - linking installs the correct marker block into native Nushell files
-- linking installs one Grapes marker block with two ordered dot-source lines into the native PowerShell profile
+- linking installs one Grapes marker block with two ordered dot-source lines into the native pwsh profile
 - pruning removes stale managed outputs for unselected shells
 
 ## Migration and Compatibility
 
 - Existing `bash` and `zsh` behavior remains unchanged.
-- Existing fragments continue to work without modification.
-- New fragments may opt into the new shells using preprocessor conditionals.
+- Existing `bash` and `zsh` fragments continue to work without modification.
+- Fragments may opt into `nushell` or `pwsh` using preprocessor conditionals.
 - No changes are required to the parser, resolver, or writer APIs visible to fragment authors.
 
 ## Recommended Implementation Boundaries
@@ -402,8 +401,8 @@ The implementation should be considered complete when:
 - `go test ./...` passes
 - the new shell targets generate correct managed files
 - native linking is idempotent on supported OS path schemes
-- preprocessor conditionals work for `NUSHELL` and `POWERSHELL`
+- preprocessor conditionals work for `NUSHELL` and `PWSH`
 
 ## Summary
 
-The recommended design is a small abstraction upgrade centered on shell-specific link installation. It keeps Grapes's current architecture intact, preserves the two-phase fragment model, adds native startup integration for `nushell` and `PowerShell` across Unix-like systems and Windows, and limits change to the places that truly need shell-specific behavior.
+The recommended design is a small abstraction upgrade centered on shell-specific link installation. It keeps Grapes's current architecture intact, preserves the two-phase fragment model, adds native startup integration for `nushell` and `pwsh` across Unix-like systems and Windows, and limits change to the places that truly need shell-specific behavior.

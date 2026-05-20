@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestRenderBlockPowershell(t *testing.T) {
+func TestRenderBlockPwsh(t *testing.T) {
 	tests := []struct {
 		name string
 		goos string
@@ -25,7 +25,7 @@ func TestRenderBlockPowershell(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := RenderBlock(tt.goos, "powershell", map[string]string{
+			got, err := RenderBlock(tt.goos, "pwsh", map[string]string{
 				"FOO": "bar",
 			}, []string{"/tool/bin"}, "echo done\n")
 			if err != nil {
@@ -96,11 +96,11 @@ func TestRenderBlockPreservesBashAndZshExpansionOrientedValues(t *testing.T) {
 
 func TestRenderBlockPreservesBashAndZshBackslashDollarSemantics(t *testing.T) {
 	tests := []struct {
-		name   string
-		shell  string
-		env    map[string]string
-		paths  []string
-		want   string
+		name  string
+		shell string
+		env   map[string]string
+		paths []string
+		want  string
 	}{
 		{
 			name:  "bash",
@@ -110,7 +110,7 @@ func TestRenderBlockPreservesBashAndZshBackslashDollarSemantics(t *testing.T) {
 				"LITERAL_GOPATH": `\${GOPATH}`,
 			},
 			paths: []string{`$HOME/\$APP/bin`},
-			want: "export LITERAL_GOPATH=\"\\${GOPATH}\"\nexport LITERAL_HOME=\"\\$HOME\"\nexport PATH=\"$HOME/\\$APP/bin\":$PATH\n",
+			want:  "export LITERAL_GOPATH=\"\\${GOPATH}\"\nexport LITERAL_HOME=\"\\$HOME\"\nexport PATH=\"$HOME/\\$APP/bin\":$PATH\n",
 		},
 		{
 			name:  "zsh",
@@ -120,7 +120,7 @@ func TestRenderBlockPreservesBashAndZshBackslashDollarSemantics(t *testing.T) {
 				"LITERAL_GOPATH": `\${GOPATH}`,
 			},
 			paths: []string{`$HOME/\$APP/bin`},
-			want: "export LITERAL_GOPATH=\"\\${GOPATH}\"\nexport LITERAL_HOME=\"\\$HOME\"\nexport PATH=\"$HOME/\\$APP/bin\":$PATH\n",
+			want:  "export LITERAL_GOPATH=\"\\${GOPATH}\"\nexport LITERAL_HOME=\"\\$HOME\"\nexport PATH=\"$HOME/\\$APP/bin\":$PATH\n",
 		},
 	}
 
@@ -300,15 +300,15 @@ func TestRenderBlockEscapesEmbeddedDoubleQuotes(t *testing.T) {
 			want:  "$env.FOO = 'a\"b'\n$env.PATH = ($env.PATH | prepend '/tool/\"bin')\n",
 		},
 		{
-			name:  "powershell windows",
+			name:  "pwsh windows",
 			goos:  "windows",
-			shell: "powershell",
+			shell: "pwsh",
 			want:  "$env:FOO = 'a\"b'\n$env:PATH = '/tool/\"bin' + ';' + $env:PATH\n",
 		},
 		{
-			name:  "powershell unix",
+			name:  "pwsh unix",
 			goos:  "linux",
-			shell: "powershell",
+			shell: "pwsh",
 			want:  "$env:FOO = 'a\"b'\n$env:PATH = '/tool/\"bin' + ':' + $env:PATH\n",
 		},
 	}
@@ -355,15 +355,15 @@ func TestRenderBlockEscapesEmbeddedSingleQuotes(t *testing.T) {
 			want:  "$env.FOO = 'a''b'\n$env.PATH = ($env.PATH | prepend '/tool/''bin')\n",
 		},
 		{
-			name:  "powershell windows",
+			name:  "pwsh windows",
 			goos:  "windows",
-			shell: "powershell",
+			shell: "pwsh",
 			want:  "$env:FOO = 'a''b'\n$env:PATH = '/tool/''bin' + ';' + $env:PATH\n",
 		},
 		{
-			name:  "powershell unix",
+			name:  "pwsh unix",
 			goos:  "linux",
-			shell: "powershell",
+			shell: "pwsh",
 			want:  "$env:FOO = 'a''b'\n$env:PATH = '/tool/''bin' + ':' + $env:PATH\n",
 		},
 	}
@@ -395,13 +395,13 @@ func TestRenderBlockPreservesPathOrderAtRuntime(t *testing.T) {
 		{name: "bash", goos: "linux", shell: "bash", initialPath: "base", wantPath: "/one:/two:base"},
 		{name: "zsh", goos: "linux", shell: "zsh", initialPath: "base", wantPath: "/one:/two:base"},
 		{name: "nushell", goos: "linux", shell: "nushell", initialPath: "base", wantPath: "/one:/two:base"},
-		{name: "powershell windows", goos: "windows", shell: "powershell", initialPath: "base", wantPath: "/one;/two;base"},
-		{name: "powershell unix", goos: "linux", shell: "powershell", initialPath: "base", wantPath: "/one:/two:base"},
+		{name: "pwsh windows", goos: "windows", shell: "pwsh", initialPath: "base", wantPath: "/one;/two;base"},
+		{name: "pwsh unix", goos: "linux", shell: "pwsh", initialPath: "base", wantPath: "/one:/two:base"},
 		{name: "bash embedded single quote", goos: "linux", shell: "bash", initialPath: "base", wantPath: "/o'ne:/tw'o:base"},
 		{name: "zsh embedded single quote", goos: "linux", shell: "zsh", initialPath: "base", wantPath: "/o'ne:/tw'o:base"},
 		{name: "nushell embedded single quote", goos: "linux", shell: "nushell", initialPath: "base", wantPath: "/o'ne:/tw'o:base"},
-		{name: "powershell windows embedded single quote", goos: "windows", shell: "powershell", initialPath: "base", wantPath: "/o'ne;/tw'o;base"},
-		{name: "powershell unix embedded single quote", goos: "linux", shell: "powershell", initialPath: "base", wantPath: "/o'ne:/tw'o:base"},
+		{name: "pwsh windows embedded single quote", goos: "windows", shell: "pwsh", initialPath: "base", wantPath: "/o'ne;/tw'o;base"},
+		{name: "pwsh unix embedded single quote", goos: "linux", shell: "pwsh", initialPath: "base", wantPath: "/o'ne:/tw'o:base"},
 	}
 
 	for _, tt := range tests {
@@ -481,10 +481,10 @@ func evaluateRenderedPath(t *testing.T, goos, shell, rendered, initialPath strin
 			if strings.HasPrefix(line, prefix) {
 				path = evaluateNushellPathPrepend(t, strings.TrimPrefix(line, prefix), path)
 			}
-		case "powershell":
+		case "pwsh":
 			const prefix = `$env:PATH = `
 			if strings.HasPrefix(line, prefix) {
-				path = evaluatePowershellPrepend(t, goos, strings.TrimPrefix(line, prefix), path)
+				path = evaluatePwshPrepend(t, goos, strings.TrimPrefix(line, prefix), path)
 			}
 		default:
 			t.Fatalf("unsupported shell %q", shell)
@@ -524,7 +524,7 @@ func evaluateNushellPathPrepend(t *testing.T, expr, currentPath string) string {
 	return literal + ":" + currentPath
 }
 
-func evaluatePowershellPrepend(t *testing.T, goos, expr, currentPath string) string {
+func evaluatePwshPrepend(t *testing.T, goos, expr, currentPath string) string {
 	t.Helper()
 
 	separator := ":"

@@ -15,7 +15,7 @@ export PATH="$GOPATH/bin:$PATH"
 #elif NUSHELL
 $env.GOPATH = ($env.GOPATH? | default ($env.HOME | path join "go"))
 $env.PATH = ($env.PATH | prepend ($env.GOPATH | path join "bin"))
-#elif POWERSHELL
+#elif PWSH
 if (-not $env:GOPATH) {
   $env:GOPATH = Join-Path $HOME "go"
 }

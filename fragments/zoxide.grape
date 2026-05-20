@@ -13,6 +13,6 @@ depend_executable:
 eval "$(zoxide init bash)"
 #elif ZSH
 eval "$(zoxide init zsh)"
-#elif POWERSHELL
+#elif PWSH
 zoxide init powershell | Out-String | Invoke-Expression
 #endif

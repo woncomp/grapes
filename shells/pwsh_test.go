@@ -2,21 +2,21 @@ package shells
 
 import "testing"
 
-func TestPowerShellManagedFilename(t *testing.T) {
+func TestPwshManagedFilename(t *testing.T) {
 	shell, err := Parse("pwsh")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := shell.ManagedFilename(PhaseEnv), "powershell-env.ps1"; got != want {
+	if got, want := shell.ManagedFilename(PhaseEnv), "pwsh-env.ps1"; got != want {
 		t.Fatalf("ManagedFilename(env) = %q, want %q", got, want)
 	}
-	if got, want := shell.ManagedFilename(PhaseMain), "powershell-profile.ps1"; got != want {
+	if got, want := shell.ManagedFilename(PhaseMain), "pwsh-profile.ps1"; got != want {
 		t.Fatalf("ManagedFilename(main) = %q, want %q", got, want)
 	}
 }
 
-func TestPowerShellLinkTargetsUnix(t *testing.T) {
-	shell, err := Parse("powershell")
+func TestPwshLinkTargetsUnix(t *testing.T) {
+	shell, err := Parse("pwsh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,16 +44,16 @@ func TestPowerShellLinkTargetsUnix(t *testing.T) {
 	if got, want := len(links[0].InstallLines), 2; got != want {
 		t.Fatalf("len(links[0].InstallLines) = %d, want %d", got, want)
 	}
-	if got, want := links[0].InstallLines[0], `. "/tmp/home/.config/grapes/powershell-env.ps1"`; got != want {
+	if got, want := links[0].InstallLines[0], `. "/tmp/home/.config/grapes/pwsh-env.ps1"`; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[1], `. "/tmp/home/.config/grapes/powershell-profile.ps1"`; got != want {
+	if got, want := links[0].InstallLines[1], `. "/tmp/home/.config/grapes/pwsh-profile.ps1"`; got != want {
 		t.Fatalf("links[0].InstallLines[1] = %q, want %q", got, want)
 	}
 }
 
-func TestPowerShellLinkTargetsWindows(t *testing.T) {
-	shell, err := Parse("powershell")
+func TestPwshLinkTargetsWindows(t *testing.T) {
+	shell, err := Parse("pwsh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,10 +78,10 @@ func TestPowerShellLinkTargetsWindows(t *testing.T) {
 	if got, want := links[0].RCFile, `C:\Users\me\Documents\PowerShell\Microsoft.PowerShell_profile.ps1`; got != want {
 		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[0], `. "C:\Users\me\AppData\Roaming\grapes\powershell-env.ps1"`; got != want {
+	if got, want := links[0].InstallLines[0], `. "C:\Users\me\AppData\Roaming\grapes\pwsh-env.ps1"`; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[1], `. "C:\Users\me\AppData\Roaming\grapes\powershell-profile.ps1"`; got != want {
+	if got, want := links[0].InstallLines[1], `. "C:\Users\me\AppData\Roaming\grapes\pwsh-profile.ps1"`; got != want {
 		t.Fatalf("links[0].InstallLines[1] = %q, want %q", got, want)
 	}
 }

@@ -13,7 +13,7 @@
 - Modular configuration fragments for tools, languages, and shell setup
 - Shell-specific generated output from a single source of configuration intent
 - Better portability when moving to a new machine or environment
-- Reduced duplication across Bash, Zsh, PowerShell, and Nushell
+- Reduced duplication across Bash, Zsh, pwsh, and Nushell
 - A clearer separation between environment definition and shell-specific config details
 
 ## Disclaimer

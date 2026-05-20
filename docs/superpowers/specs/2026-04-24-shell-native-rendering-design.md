@@ -7,7 +7,7 @@ The current Grapes pipeline expands frontmatter `env` and `paths` fields in the 
 - `export KEY="VALUE"`
 - `export PATH="ENTRY:$PATH"`
 
-That works for `bash` and `zsh`, but it breaks the newly added `nushell` and `powershell` targets because their managed files now contain shell-native startup-file locations and load commands, but still receive POSIX-flavored generated content.
+That works for `bash` and `zsh`, but it breaks the newly added `nushell` and `pwsh` targets because their managed files now contain shell-native startup-file locations and load commands, but still receive POSIX-flavored generated content.
 
 This design extends Grapes so `env` and `paths` render natively for every supported shell while preserving the existing fragment model and phase model.
 
@@ -19,9 +19,9 @@ This design extends Grapes so `env` and `paths` render natively for every suppor
   - `bash`
   - `zsh`
   - `nushell`
-  - `powershell`
+  - `pwsh`
 - Keep parsing shell-agnostic.
-- Close the runtime gap where `powershell` and `nushell` files can be linked but still contain incompatible generated content.
+- Close the runtime gap where `pwsh` and `nushell` files can be linked but still contain incompatible generated content.
 
 ## Non-Goals
 
@@ -38,7 +38,7 @@ That means:
 
 - `bash` and `zsh` are correct
 - `nushell` receives POSIX `export ...` lines
-- `powershell` receives POSIX `export ...` lines
+- `pwsh` receives POSIX `export ...` lines
 
 The shell-registration work is therefore incomplete at runtime for fragments that use frontmatter-driven environment or path setup.
 
@@ -138,19 +138,19 @@ $env.PATH = ($env.PATH | prepend "entry")
 
 This exact prepend form should be used so the spec is testable and unambiguous.
 
-### PowerShell
+### pwsh
 
-Render frontmatter using PowerShell-native syntax.
+Render frontmatter using pwsh-native syntax.
 
 Environment variables:
 
-```powershell
+```pwsh
 $env:NAME = "value"
 ```
 
 Path prepend:
 
-```powershell
+```pwsh
 $env:PATH = "entry;$env:PATH"
 ```
 
@@ -178,7 +178,7 @@ Add renderer tests that verify shell-native `env` and `paths` output for:
 - `bash`
 - `zsh`
 - `nushell`
-- `powershell`
+- `pwsh`
 
 These tests should cover:
 
@@ -188,7 +188,7 @@ These tests should cover:
 
 ### End-to-end coverage
 
-Add CLI or writer-facing tests that generate managed files for `nushell` and `powershell` from fragments using frontmatter `env` and `paths`, then assert:
+Add CLI or writer-facing tests that generate managed files for `nushell` and `pwsh` from fragments using frontmatter `env` and `paths`, then assert:
 
 - output files exist
 - output contains shell-native syntax
@@ -209,8 +209,8 @@ This extension is complete when:
 
 - `go test ./...` passes
 - frontmatter `env` and `paths` render correctly for all supported shells
-- `nushell` and `powershell` managed files no longer contain incompatible POSIX exports for those frontmatter-driven lines
+- `nushell` and `pwsh` managed files no longer contain incompatible POSIX exports for those frontmatter-driven lines
 
 ## Summary
 
-The right fix is to delay `env` and `paths` rendering until Grapes knows the target shell. That keeps parsing shell-agnostic, preserves the current fragment model, and makes the newly added `nushell` and `powershell` targets functionally complete for frontmatter-driven environment and path setup.
+The right fix is to delay `env` and `paths` rendering until Grapes knows the target shell. That keeps parsing shell-agnostic, preserves the current fragment model, and makes the newly added `nushell` and `pwsh` targets functionally complete for frontmatter-driven environment and path setup.

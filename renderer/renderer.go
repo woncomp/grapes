@@ -9,7 +9,7 @@ import (
 
 func RenderBlock(goos, shell string, env map[string]string, paths []string, body string) (string, error) {
 	switch shell {
-	case "bash", "zsh", "nushell", "powershell":
+	case "bash", "zsh", "nushell", "pwsh":
 	default:
 		return "", fmt.Errorf("unsupported shell %q", shell)
 	}
@@ -22,7 +22,7 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 			lines = append(lines, fmt.Sprintf("export %s=%s", key, quoteValue(shell, env[key])))
 		case "nushell":
 			lines = append(lines, fmt.Sprintf("$env.%s = %s", key, quoteValue(shell, env[key])))
-		case "powershell":
+		case "pwsh":
 			lines = append(lines, fmt.Sprintf("$env:%s = %s", key, quoteValue(shell, env[key])))
 		}
 	}
@@ -34,11 +34,11 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 			lines = append(lines, fmt.Sprintf("export PATH=%s:$PATH", quoteValue(shell, path)))
 		case "nushell":
 			lines = append(lines, fmt.Sprintf("$env.PATH = ($env.PATH | prepend %s)", quoteValue(shell, path)))
-		case "powershell":
+		case "pwsh":
 			lines = append(lines, fmt.Sprintf(
 				"$env:PATH = %s + %s + $env:PATH",
 				quoteValue(shell, path),
-				quoteValue(shell, powershellPathSeparator(goos)),
+				quoteValue(shell, pwshPathSeparator(goos)),
 			))
 		}
 	}
@@ -52,7 +52,7 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 	return strings.Join(lines, "\n") + "\n" + body, nil
 }
 
-func powershellPathSeparator(goos string) string {
+func pwshPathSeparator(goos string) string {
 	if goos == "windows" {
 		return ";"
 	}
@@ -63,7 +63,7 @@ func quoteValue(shell, value string) string {
 	switch shell {
 	case "bash", "zsh":
 		return quotePosixDoubleQuotedValue(value)
-	case "nushell", "powershell":
+	case "nushell", "pwsh":
 		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 	default:
 		panic(fmt.Sprintf("unsupported shell %q", shell))

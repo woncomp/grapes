@@ -5,26 +5,26 @@ import (
 	"path/filepath"
 )
 
-type powershellShell struct{}
+type pwshShell struct{}
 
 func init() {
-	registerShell(powershellShell{})
+	registerShell(pwshShell{})
 }
 
-func (powershellShell) Name() string { return "powershell" }
+func (pwshShell) Name() string { return "pwsh" }
 
-func (powershellShell) Aliases() []string { return []string{"powershell", "pwsh"} }
+func (pwshShell) Aliases() []string { return []string{"pwsh"} }
 
-func (powershellShell) ManagedFilename(phase string) string {
+func (pwshShell) ManagedFilename(phase string) string {
 	switch phase {
 	case PhaseEnv:
-		return "powershell-env.ps1"
+		return "pwsh-env.ps1"
 	default:
-		return "powershell-profile.ps1"
+		return "pwsh-profile.ps1"
 	}
 }
 
-func (p powershellShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
+func (p pwshShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
 	home, err := homeDir(ctx.GOOS, ctx.LookupEnv)
 	if err != nil {
 		return nil, err

@@ -94,7 +94,7 @@ Examples:
 
 - `bash` may review one or more user-owned link targets together
 - `zsh` may review one or more user-owned link targets together
-- `powershell` may review its native profile target as one shell-level unit
+- `pwsh` may review its native profile target as one shell-level unit
 
 Each shell review contains only that shell's user-owned rc/profile link targets. Grapes-managed output files under the managed output directory are out of scope for the dialog.
 

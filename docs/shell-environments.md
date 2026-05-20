@@ -7,7 +7,7 @@
 | Zsh   | .zshenv             | .zshrc                   | .zprofile / .zlogin | .zlogout          |
 | Bash (通常借用 .bashrc) | .bashrc | .bash_profile / .bash_login | .bash_logout | - |
 | Fish  | config.fish (内判)  | config.fish (不常用，通过函数判断) | - | (需定义 on_exit 函数) |
-| PowerShell | $PROFILE (所有宿主) | $PROFILE (当前宿主) | (同左) | (需在脚本块定义) |
+| pwsh | $PROFILE (所有宿主) | $PROFILE (当前宿主) | (同左) | (需在脚本块定义) |
 | Nushell | env.nu | config.nu | (同左) | (不常用) |
 | Dash  | $ENV 变量指向的文件 (不支持自动加载) | .profile (由 Login 进程加载) | - | (不支持) |
 

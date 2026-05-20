@@ -122,7 +122,7 @@ func TestParseArgsUsesExplicitTargetAlias(t *testing.T) {
 	}
 }
 
-func TestParseArgsUsesPowerShellAlias(t *testing.T) {
+func TestParseArgsUsesPwshTarget(t *testing.T) {
 	opts, err := parseArgs([]string{"master.grapes", "-t", "pwsh"}, func(string) (string, bool) {
 		return "", false
 	})
@@ -130,8 +130,20 @@ func TestParseArgsUsesPowerShellAlias(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := joinTargetNames(opts.targets), "powershell"; got != want {
+	if got, want := joinTargetNames(opts.targets), "pwsh"; got != want {
 		t.Fatalf("targets = %q, want %q", got, want)
+	}
+}
+
+func TestParseArgsRejectsLegacyWindowsPSTargetName(t *testing.T) {
+	_, err := parseArgs([]string{"master.grapes", "-t", "powershell"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `unsupported target "powershell"`) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -335,7 +347,7 @@ echo prompt
 	assertLineExcludesFragments(t, content, "__GRAPES_SHELL", "export ")
 }
 
-func TestRunNoLinkRendersPowerShellEnvAndPathsNatively(t *testing.T) {
+func TestRunNoLinkRendersPwshEnvAndPathsNatively(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
@@ -360,7 +372,7 @@ paths:
 echo prompt
 `)
 
-	target, err := shells.Parse("powershell")
+	target, err := shells.Parse("pwsh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,12 +391,12 @@ echo prompt
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	data, err := os.ReadFile(filepath.Join(outputDir, "powershell-env.ps1"))
+	data, err := os.ReadFile(filepath.Join(outputDir, "pwsh-env.ps1"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	content := string(data)
-	assertLineContainsFragments(t, content, "$env:__GRAPES_SHELL = ", "powershell")
+	assertLineContainsFragments(t, content, "$env:__GRAPES_SHELL = ", "pwsh")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
@@ -451,7 +463,7 @@ imports:
 	assertFileExcludes(t, combined, "zoxide init")
 }
 
-func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPowerShell(t *testing.T) {
+func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPwsh(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
@@ -478,7 +490,7 @@ imports:
 ---
 `)
 
-	target := mustParseShell(t, "powershell")
+	target := mustParseShell(t, "pwsh")
 	if err := runWithOptions(runOptions{
 		masterPath: masterPath,
 		targets:    []shells.Shell{target},
@@ -493,8 +505,8 @@ imports:
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	envContent := mustReadFile(t, filepath.Join(outputDir, "powershell-env.ps1"))
-	mainContent := mustReadFile(t, filepath.Join(outputDir, "powershell-profile.ps1"))
+	envContent := mustReadFile(t, filepath.Join(outputDir, "pwsh-env.ps1"))
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "pwsh-profile.ps1"))
 	combined := envContent + "\n" + mainContent
 
 	assertNoPosixBuiltInSyntax(t, combined)

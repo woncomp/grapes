@@ -9,7 +9,7 @@ import (
 
 func TestSupportedNames(t *testing.T) {
 	names := SupportedNames()
-	if got, want := strings.Join(names, ","), "bash,nushell,powershell,zsh"; got != want {
+	if got, want := strings.Join(names, ","), "bash,nushell,pwsh,zsh"; got != want {
 		t.Fatalf("SupportedNames() = %q, want %q", got, want)
 	}
 }
@@ -34,6 +34,16 @@ func TestParseUnsupported(t *testing.T) {
 	}
 }
 
+func TestParseDoesNotSupportLegacyWindowsPSTargetName(t *testing.T) {
+	_, err := Parse("powershell")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `unsupported target "powershell"`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestDetectCurrent(t *testing.T) {
 	shell, err := DetectCurrent(func(key string) (string, bool) {
 		if key == "SHELL" {
@@ -49,16 +59,16 @@ func TestDetectCurrent(t *testing.T) {
 	}
 }
 
-func TestDetectCurrentUsesPowerShellProcessAncestor(t *testing.T) {
+func TestDetectCurrentUsesPwshProcessAncestor(t *testing.T) {
 	shell, err := detectCurrent(func(string) (string, bool) {
 		return "", false
 	}, func() []string {
-		return []string{`C:\Program Files\PowerShell\7\pwsh.exe`}
+		return []string{"pwsh.exe"}
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := shell.Name(), "powershell"; got != want {
+	if got, want := shell.Name(), "pwsh"; got != want {
 		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
 	}
 }
@@ -72,7 +82,7 @@ func TestDetectCurrentUsesSupportedProcessAncestorThroughGoRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := shell.Name(), "powershell"; got != want {
+	if got, want := shell.Name(), "pwsh"; got != want {
 		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
 	}
 }
@@ -86,7 +96,7 @@ func TestDetectCurrentUsesSupportedProcessAncestorThroughWindowsGoRun(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := shell.Name(), "powershell"; got != want {
+	if got, want := shell.Name(), "pwsh"; got != want {
 		t.Fatalf("DetectCurrent().Name() = %q, want %q", got, want)
 	}
 }
@@ -242,8 +252,8 @@ func TestInstallSupportsMultipleLines(t *testing.T) {
 	rcFile := filepath.Join(dir, "PowerShell", "Microsoft.PowerShell_profile.ps1")
 
 	err := Install(rcFile, []string{
-		`. "$HOME/.config/grapes/powershell-env.ps1"`,
-		`. "$HOME/.config/grapes/powershell-profile.ps1"`,
+		`. "$HOME/.config/grapes/pwsh-env.ps1"`,
+		`. "$HOME/.config/grapes/pwsh-profile.ps1"`,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -255,10 +265,10 @@ func TestInstallSupportsMultipleLines(t *testing.T) {
 	}
 
 	content := string(data)
-	if !strings.Contains(content, `. "$HOME/.config/grapes/powershell-env.ps1"`) {
+	if !strings.Contains(content, `. "$HOME/.config/grapes/pwsh-env.ps1"`) {
 		t.Fatalf("missing env install line: %q", content)
 	}
-	if !strings.Contains(content, `. "$HOME/.config/grapes/powershell-profile.ps1"`) {
+	if !strings.Contains(content, `. "$HOME/.config/grapes/pwsh-profile.ps1"`) {
 		t.Fatalf("missing main install line: %q", content)
 	}
 }

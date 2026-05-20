@@ -48,7 +48,7 @@ func shellInjectionLine(shell string) string {
 	switch strings.ToLower(shell) {
 	case "nushell":
 		return fmt.Sprintf(`$env.__GRAPES_SHELL = "%s"`, shell)
-	case "powershell":
+	case "pwsh":
 		return fmt.Sprintf(`$env:__GRAPES_SHELL = "%s"`, shell)
 	default:
 		return fmt.Sprintf(`export __GRAPES_SHELL="%s"`, shell)
