@@ -333,14 +333,14 @@ echo bun
 
 func TestParseGrapeFileDependFile(t *testing.T) {
 	dir := t.TempDir()
-	path := writeTempFile(t, dir, "nvm.grape", `---
+	path := writeTempFile(t, dir, "tool.grape", `---
 phase: main
 depend_file:
   paths:
-    - ~/.nvm/nvm.sh
-    - $NVM_HOME/nvm.exe
+    - ~/.tool/tool.sh
+    - $TOOL_HOME/tool.exe
 ---
-echo nvm
+echo tool
 `)
 
 	grape, err := ParseGrapeFile(path)
@@ -353,10 +353,10 @@ echo nvm
 	if got, want := len(grape.DependFile.Paths), 2; got != want {
 		t.Fatalf("len(Paths) = %d, want %d", got, want)
 	}
-	if got, want := grape.DependFile.Paths[0], "~/.nvm/nvm.sh"; got != want {
+	if got, want := grape.DependFile.Paths[0], "~/.tool/tool.sh"; got != want {
 		t.Fatalf("Paths[0] = %q, want %q", got, want)
 	}
-	if got, want := grape.DependFile.Paths[1], "$NVM_HOME/nvm.exe"; got != want {
+	if got, want := grape.DependFile.Paths[1], "$TOOL_HOME/tool.exe"; got != want {
 		t.Fatalf("Paths[1] = %q, want %q", got, want)
 	}
 }

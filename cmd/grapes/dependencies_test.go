@@ -11,13 +11,13 @@ import (
 )
 
 func TestDependencyLabelsReflectType(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "nvm.sh")
-	if err := os.WriteFile(file, []byte("echo nvm"), 0o644); err != nil {
+	file := filepath.Join(t.TempDir(), "tool.sh")
+	if err := os.WriteFile(file, []byte("echo tool"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	grapes := []*parser.GrapeFile{
 		{Name: "plain"},
-		{Name: "nvm", DependFile: &parser.DependFile{Paths: []string{file}}},
+		{Name: "tool", DependFile: &parser.DependFile{Paths: []string{file}}},
 		{Name: "zoxide", DependExecutable: &parser.DependExecutable{Binary: "zoxide"}},
 	}
 
@@ -196,13 +196,13 @@ func TestExecutableDependencyCheckVersionWarningsAndSuccess(t *testing.T) {
 
 func TestFileDependencyCheckMatchesExistingFile(t *testing.T) {
 	dir := t.TempDir()
-	match := filepath.Join(dir, "nvm.sh")
-	if err := os.WriteFile(match, []byte("echo nvm"), 0o644); err != nil {
+	match := filepath.Join(dir, "tool.sh")
+	if err := os.WriteFile(match, []byte("echo tool"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	grapes := []*parser.GrapeFile{{
-		Name:       "nvm",
+		Name:       "tool",
 		DependFile: &parser.DependFile{Paths: []string{filepath.Join(dir, "*.sh")}},
 	}}
 
@@ -223,31 +223,31 @@ func TestFileDependencyCheckMatchesExistingFile(t *testing.T) {
 
 func TestFileDependencyCheckSupportsTildeEnvAndGlobAndRejectsDirectories(t *testing.T) {
 	home := t.TempDir()
-	nvmHome := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(home, ".nvm"), 0o755); err != nil {
+	toolHome := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".tool"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	file1 := filepath.Join(home, ".nvm", "nvm.sh")
-	if err := os.WriteFile(file1, []byte("echo nvm"), 0o644); err != nil {
+	file1 := filepath.Join(home, ".tool", "tool.sh")
+	if err := os.WriteFile(file1, []byte("echo tool"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(nvmHome, "v1"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(toolHome, "v1"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	file2 := filepath.Join(nvmHome, "v1", "nvm.exe")
+	file2 := filepath.Join(toolHome, "v1", "tool.exe")
 	if err := os.WriteFile(file2, []byte("binary"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(nvmHome, "dir-only.exe"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(toolHome, "dir-only.exe"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	grapes := []*parser.GrapeFile{{
-		Name: "nvm",
+		Name: "tool",
 		DependFile: &parser.DependFile{Paths: []string{
-			"~/.nvm/*.sh",
-			"$NVM_HOME/*/nvm.exe",
-			"$NVM_HOME/dir-only.exe",
+			"~/.tool/*.sh",
+			"$TOOL_HOME/*/tool.exe",
+			"$TOOL_HOME/dir-only.exe",
 		}},
 	}}
 
@@ -255,8 +255,8 @@ func TestFileDependencyCheckSupportsTildeEnvAndGlobAndRejectsDirectories(t *test
 		switch key {
 		case "HOME":
 			return home, true
-		case "NVM_HOME":
-			return nvmHome, true
+		case "TOOL_HOME":
+			return toolHome, true
 		default:
 			return "", false
 		}

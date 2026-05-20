@@ -413,6 +413,7 @@ func TestRunNoLinkBuiltinsAvoidPosixSyntaxForNushell(t *testing.T) {
 	t.Setenv("PATH", binDir)
 	createExecutable(t, binDir, "go", "echo go version go1.24.1 linux/amd64")
 	createExecutable(t, binDir, "bun", "echo 1.2.0")
+	createExecutable(t, binDir, "fnm", "echo 1.39.0")
 	createExecutable(t, binDir, "uv", "echo uv 0.7.2")
 	if runtime.GOOS == "windows" {
 		appData = t.TempDir()
@@ -423,7 +424,7 @@ func TestRunNoLinkBuiltinsAvoidPosixSyntaxForNushell(t *testing.T) {
 imports:
   - go
   - bun
-  - nvm
+  - fnm
   - uv
   - zoxide
   - fzf
@@ -455,8 +456,7 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", ".local")
-	assertFileExcludes(t, combined, "nvm.sh")
-	assertFileExcludes(t, combined, "bash_completion")
+	assertFileExcludes(t, combined, "fnm env")
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertFileExcludes(t, combined, "generate-shell-completion nushell")
@@ -472,6 +472,7 @@ func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPwsh(t *testing.T) {
 	t.Setenv("PATH", binDir)
 	createExecutable(t, binDir, "go", "echo go version go1.24.1 linux/amd64")
 	createExecutable(t, binDir, "bun", "echo 1.2.0")
+	createExecutable(t, binDir, "fnm", "echo 1.39.0")
 	createExecutable(t, binDir, "uv", "echo uv 0.7.2")
 	createExecutable(t, binDir, "zoxide", "echo zoxide 0.9.4")
 	if runtime.GOOS == "windows" {
@@ -483,7 +484,7 @@ func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPwsh(t *testing.T) {
 imports:
   - go
   - bun
-  - nvm
+  - fnm
   - uv
   - zoxide
   - fzf
@@ -515,26 +516,21 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", ".local", "$HOME")
-	assertFileExcludes(t, combined, "nvm.sh")
-	assertFileExcludes(t, combined, "bash_completion")
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
+	assertLineContainsFragments(t, mainContent, "fnm env", "powershell", "Invoke-Expression")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
 	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "zoxide init powershell")
 }
 
-func TestRunDependencyChecksFileDependencyRendersWhenFileExists(t *testing.T) {
+func TestRunDependencyChecksExecutableDependencyRendersWhenBinaryExists(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
-	nvmDir := filepath.Join(home, ".nvm")
-	if err := os.MkdirAll(nvmDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(nvmDir, "nvm.sh"), []byte("echo nvm"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	binDir := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	createExecutable(t, binDir, "fnm", "echo 1.39.0")
 	if runtime.GOOS == "windows" {
 		appData = t.TempDir()
 		t.Setenv("APPDATA", appData)
@@ -542,16 +538,18 @@ func TestRunDependencyChecksFileDependencyRendersWhenFileExists(t *testing.T) {
 
 	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
 imports:
-  - nvm
+  - fnm
 ---
 `)
-	writeTempFile(t, sourceDir, "nvm.grape", `---
-phase: env
-depend_file:
-  paths:
-    - ~/.nvm/nvm.sh
+	writeTempFile(t, sourceDir, "fnm.grape", `---
+phase: main
+depend_executable:
+  binary: fnm
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-echo nvm-fragment
+echo fnm-fragment
 `)
 
 	target := mustParseShell(t, "bash")
@@ -569,14 +567,15 @@ echo nvm-fragment
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	assertFileContains(t, filepath.Join(outputDir, "bashenv"), "nvm-fragment")
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "fnm-fragment")
 }
 
-func TestRunDependencyChecksFileDependencySkipsWhenFileMissing(t *testing.T) {
+func TestRunDependencyChecksExecutableDependencySkipsWhenBinaryMissing(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
 	if runtime.GOOS == "windows" {
 		appData = t.TempDir()
 		t.Setenv("APPDATA", appData)
@@ -584,16 +583,18 @@ func TestRunDependencyChecksFileDependencySkipsWhenFileMissing(t *testing.T) {
 
 	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
 imports:
-  - nvm
+  - fnm
 ---
 `)
-	writeTempFile(t, sourceDir, "nvm.grape", `---
-phase: env
-depend_file:
-  paths:
-    - ~/.nvm/nvm.sh
+	writeTempFile(t, sourceDir, "fnm.grape", `---
+phase: main
+depend_executable:
+  binary: fnm
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-echo nvm-fragment
+echo fnm-fragment
 `)
 
 	target := mustParseShell(t, "bash")
@@ -611,8 +612,8 @@ echo nvm-fragment
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	content := mustReadFile(t, filepath.Join(outputDir, "bashenv"))
-	assertFileExcludes(t, content, "nvm-fragment")
+	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	assertFileExcludes(t, content, "fnm-fragment")
 }
 
 func TestRunDependencyChecksSafeModeSkipsWarningsAndFailures(t *testing.T) {
@@ -1320,7 +1321,6 @@ func assertNoPosixBuiltInSyntax(t *testing.T, content string) {
 		`${VAR:-`,
 		`${GOPATH:-`,
 		`${BUN_INSTALL:-`,
-		`${NVM_DIR:-`,
 	} {
 		assertFileExcludes(t, content, forbidden)
 	}

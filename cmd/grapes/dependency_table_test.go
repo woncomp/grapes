@@ -11,7 +11,7 @@ func TestDependencyTableRendersSummaryAndDetails(t *testing.T) {
 	results := []grapeDependencyResult{
 		{Grape: &parser.GrapeFile{Name: "plain"}, Dependency: "n/a", Status: dependencyStatusOK, Location: "n/a", Version: "n/a"},
 		{Grape: &parser.GrapeFile{Name: "zoxide"}, Dependency: "executable:zoxide", Status: dependencyStatusWarning, Location: "/usr/bin/zoxide", Version: "unknown", Detail: "version output did not match version_regex"},
-		{Grape: &parser.GrapeFile{Name: "nvm"}, Dependency: "file", Status: dependencyStatusFailed, Location: "not found", Version: "n/a", Detail: "not installed"},
+		{Grape: &parser.GrapeFile{Name: "tool"}, Dependency: "file", Status: dependencyStatusFailed, Location: "not found", Version: "n/a", Detail: "not installed"},
 	}
 
 	text := renderDependencyTable(results, false)

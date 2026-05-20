@@ -8,7 +8,7 @@ import (
 	"github.com/woncomp/grapes/preprocessor"
 )
 
-var expectedFragments = []string{"go", "nvm", "uv", "bun", "zoxide", "fzf"}
+var expectedFragments = []string{"go", "fnm", "uv", "bun", "zoxide", "fzf"}
 
 func TestAllFragmentsEmbedded(t *testing.T) {
 	for _, name := range expectedFragments {
@@ -69,11 +69,11 @@ func TestEmbeddedBuiltinDependencyConfigs(t *testing.T) {
 		wantConfigured bool
 	}{
 		{name: "bun", wantBinary: "bun", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
+		{name: "fnm", wantBinary: "fnm", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
 		{name: "fzf", wantBinary: "fzf", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
 		{name: "go", wantBinary: "go", wantArgs: []string{"version"}, wantRegex: `go([0-9]+\.[0-9]+(?:\.[0-9]+)?)`, wantConfigured: true},
 		{name: "uv", wantBinary: "uv", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
 		{name: "zoxide", wantBinary: "zoxide", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
-		{name: "nvm", wantConfigured: false},
 	}
 
 	for _, tc := range tests {
@@ -87,18 +87,6 @@ func TestEmbeddedBuiltinDependencyConfigs(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if tc.name == "nvm" {
-				if frag.DependExecutable != nil {
-					t.Fatalf("DependExecutable = %#v, want nil", frag.DependExecutable)
-				}
-				if frag.DependFile == nil {
-					t.Fatal("DependFile = nil, want config")
-				}
-				if len(frag.DependFile.Paths) == 0 {
-					t.Fatal("DependFile.Paths empty, want paths")
-				}
-				return
-			}
 			if !tc.wantConfigured {
 				if frag.DependExecutable != nil {
 					t.Fatalf("DependExecutable = %#v, want nil", frag.DependExecutable)
