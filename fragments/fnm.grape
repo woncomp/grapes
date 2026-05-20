@@ -6,10 +6,16 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef BASH
-eval "$(fnm env --use-on-cd --shell bash)"
-#elif ZSH
-eval "$(fnm env --use-on-cd --shell zsh)"
-#elif POWERSHELL
-fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+#ifdef NUSHELL
+fnm env --use-on-cd --shell bash
+| lines
+| where ($in | str starts-with "export ")
+| parse "export {key}=\"{value}\""
+| transpose -r
+| load-env
+$env.PATH = ($env.PATH | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
+#elif PWSH
+fnm env --use-on-cd | Out-String | Invoke-Expression
+#else
+eval "$(fnm env --use-on-cd)"
 #endif
