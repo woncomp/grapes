@@ -44,6 +44,21 @@ Field behavior:
 
 Subsequent blocks may change `phase`, `env`, `paths`, and `body`, but not `deps`.
 
+## CLI utility mode
+
+Grapes also provides a utility mode for PATH cleanup:
+
+```bash
+grapes --path-clean "$PATH"
+```
+
+Behavior:
+
+- splits using the current platform PATH separator
+- removes empty entries
+- removes later duplicates while preserving the first occurrence exactly as written
+- prints the cleaned PATH string to stdout and exits without running normal generation
+
 ## Master `.toml` file model
 
 Master files use an ordered TOML array of `[[grape]]` tables:
@@ -187,6 +202,8 @@ Generated `env` outputs inject:
 - `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`
 
 During generation, the `grapes` executable creates both `GRAPES_OUT_CACHE_DIR` and `~/.local/state/grapes` before writing managed outputs. Generated shell files no longer emit mkdir logic for those directories.
+
+Generated `env` and `main` outputs also end with a shell-native self-call to `grapes --path-clean`, so PATH is de-duplicated after all fragment logic has run.
 
 Executable-gated fragment scopes also inject:
 

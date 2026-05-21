@@ -141,6 +141,45 @@ func TestOutputCacheDirInjection(t *testing.T) {
 	}
 }
 
+func TestPathCleanInjectionLine(t *testing.T) {
+	tests := []struct {
+		shell    string
+		execPath string
+		want     string
+	}{
+		{
+			shell:    "bash",
+			execPath: `C:\tools\grapes.exe`,
+			want:     `export PATH="$("C:/tools/grapes.exe" --path-clean "$PATH")"`,
+		},
+		{
+			shell:    "zsh",
+			execPath: `/opt/grapes`,
+			want:     `export PATH="$("/opt/grapes" --path-clean "$PATH")"`,
+		},
+		{
+			shell:    "nushell",
+			execPath: `/opt/grapes`,
+			want:     `$env.PATH = (^'/opt/grapes' --path-clean ($env.PATH | str join (char esep)) | split row (char esep))`,
+		},
+		{
+			shell:    "pwsh",
+			execPath: `C:\tools\grapes.exe`,
+			want:     `$env:PATH = & 'C:\tools\grapes.exe' --path-clean $env:PATH`,
+		},
+	}
+
+	for _, tt := range tests {
+		got, err := PathCleanInjectionLine(tt.shell, tt.execPath)
+		if err != nil {
+			t.Fatalf("PathCleanInjectionLine(%q) returned error: %v", tt.shell, err)
+		}
+		if got != tt.want {
+			t.Fatalf("PathCleanInjectionLine(%q) = %q, want %q", tt.shell, got, tt.want)
+		}
+	}
+}
+
 func TestIfdefMatch(t *testing.T) {
 	input := "--#ifdef BASH\necho bash\n--#endif\necho common\n"
 	result, err := Process(input, "bash")

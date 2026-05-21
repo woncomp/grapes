@@ -39,6 +39,8 @@ type cliOptions struct {
 	assumeYes      bool
 	dependencyMode dependencyMode
 	noLink         bool
+	pathClean      string
+	pathCleanMode  bool
 }
 
 type runOptions struct {
@@ -74,6 +76,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if opts.pathCleanMode {
+		fmt.Println(cleanPathList(opts.pathClean, os.PathListSeparator))
+		return
+	}
+
 	if err := runWithOptions(runOptions{
 		masterPath:     opts.masterPath,
 		targets:        opts.targets,
@@ -106,6 +113,16 @@ func parseArgsWithShellDetector(args []string, lookupEnv func(string) (string, b
 		switch {
 		case arg == "-h" || arg == "--help":
 			return cliOptions{}, errHelpRequested
+		case arg == "--path-clean":
+			if i+1 >= len(args) {
+				return cliOptions{}, fmt.Errorf("missing value for %s", arg)
+			}
+			i++
+			opts.pathCleanMode = true
+			opts.pathClean = args[i]
+		case strings.HasPrefix(arg, "--path-clean="):
+			opts.pathCleanMode = true
+			opts.pathClean = strings.TrimPrefix(arg, "--path-clean=")
 		case arg == "-y" || arg == "--yes":
 			opts.assumeYes = true
 			opts.dependencyMode = dependencyModeSafe
@@ -143,6 +160,16 @@ func parseArgsWithShellDetector(args []string, lookupEnv func(string) (string, b
 		}
 	}
 
+	if opts.pathCleanMode {
+		if opts.masterPath != "" {
+			return cliOptions{}, fmt.Errorf("--path-clean cannot be combined with an input file")
+		}
+		if len(opts.targets) > 0 || opts.assumeYes || opts.noLink || opts.dependencyMode != dependencyModePrompt {
+			return cliOptions{}, fmt.Errorf("--path-clean cannot be combined with generation flags")
+		}
+		return opts, nil
+	}
+
 	if opts.masterPath == "" {
 		return cliOptions{}, fmt.Errorf("missing input file")
 	}
@@ -178,10 +205,12 @@ func addTarget(targets *[]shells.Shell, seen map[string]bool, raw string) error 
 
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--dependency-mode mode] [--yes] [--nolink]")
+	fmt.Fprintln(w, "   or: grapes --path-clean <path>")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Generate shell rc files from local .grape fragments.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "      --path-clean path  Remove duplicate and empty PATH entries, print cleaned PATH, then exit")
 	fmt.Fprintln(w, "  -t, --target shell   Target shell to generate and link (repeatable; default: current shell)")
 	fmt.Fprintln(w, "      --dependency-mode mode  Dependency handling mode: prompt, safe, allow-warnings, fail")
 	fmt.Fprintln(w, "  -y, --yes            Approve dependency review in safe mode and skip shell link prompts")
@@ -261,6 +290,22 @@ func parseDependencyMode(raw string) (dependencyMode, error) {
 	}
 }
 
+func cleanPathList(pathValue string, separator rune) string {
+	parts := strings.Split(pathValue, string(separator))
+	seen := make(map[string]bool, len(parts))
+	cleaned := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		if part == "" || seen[part] {
+			continue
+		}
+		seen[part] = true
+		cleaned = append(cleaned, part)
+	}
+
+	return strings.Join(cleaned, string(separator))
+}
+
 func runWithOptions(opts runOptions) error {
 	lookupEnv := opts.lookupEnv
 	if lookupEnv == nil {
@@ -282,6 +327,10 @@ func runWithOptions(opts runOptions) error {
 	outputDir, err := managedOutputDir(opts.goos, lookupEnv)
 	if err != nil {
 		return err
+	}
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolving current executable path: %w", err)
 	}
 
 	if filepath.Ext(opts.masterPath) != ".toml" {
@@ -407,6 +456,16 @@ func runWithOptions(opts runOptions) error {
 				shellFragments = append(shellFragments, writer.Fragment{
 					Name:    "__GRAPE_SCOPE_CLEANUP",
 					Content: scopeCleanup,
+				})
+			}
+			if phase == shells.PhaseEnv || phase == shells.PhaseMain {
+				pathCleanLine, err := preprocessor.PathCleanInjectionLine(target.Name(), execPath)
+				if err != nil {
+					return fmt.Errorf("rendering path cleanup for %s: %w", target.Name(), err)
+				}
+				shellFragments = append(shellFragments, writer.Fragment{
+					Name:    "__PATH_CLEAN",
+					Content: pathCleanLine + "\n",
 				})
 			}
 			filename := target.ManagedFilename(phase)

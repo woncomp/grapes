@@ -37,6 +37,70 @@ func TestParseArgsUsesExplicitTargets(t *testing.T) {
 	}
 }
 
+func TestParseArgsSupportsPathCleanMode(t *testing.T) {
+	opts, err := parseArgs([]string{"--path-clean", "/bin:/usr/bin:/bin"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !opts.pathCleanMode {
+		t.Fatal("pathCleanMode = false, want true")
+	}
+	if got, want := opts.pathClean, "/bin:/usr/bin:/bin"; got != want {
+		t.Fatalf("pathClean = %q, want %q", got, want)
+	}
+	if opts.masterPath != "" {
+		t.Fatalf("masterPath = %q, want empty", opts.masterPath)
+	}
+}
+
+func TestParseArgsRejectsPathCleanWithoutValue(t *testing.T) {
+	_, err := parseArgs([]string{"--path-clean"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "missing value for --path-clean") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsRejectsPathCleanWithInputFile(t *testing.T) {
+	_, err := parseArgs([]string{"--path-clean", "/bin", "master.toml"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--path-clean cannot be combined with an input file") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsRejectsPathCleanWithGenerationFlags(t *testing.T) {
+	tests := [][]string{
+		{"--path-clean", "/bin", "-t", "zsh"},
+		{"--path-clean", "/bin", "--target=bash"},
+		{"--path-clean", "/bin", "--yes"},
+		{"--path-clean", "/bin", "--nolink"},
+		{"--path-clean", "/bin", "--dependency-mode=fail"},
+	}
+
+	for _, args := range tests {
+		_, err := parseArgs(args, func(string) (string, bool) {
+			return "", false
+		})
+		if err == nil {
+			t.Fatalf("expected error for args %v, got nil", args)
+		}
+		if !strings.Contains(err.Error(), "--path-clean cannot be combined with generation flags") {
+			t.Fatalf("unexpected error for args %v: %v", args, err)
+		}
+	}
+}
+
 func TestParseArgsSupportsYesFlag(t *testing.T) {
 	opts, err := parseArgs([]string{"master.toml", "--yes"}, func(key string) (string, bool) {
 		if key == "SHELL" {
@@ -203,6 +267,9 @@ func TestPrintUsageUsesNewCommandShape(t *testing.T) {
 	if !strings.Contains(usage, "Usage: grapes <input> [-t shell]... [--dependency-mode mode] [--yes] [--nolink]") {
 		t.Fatalf("usage did not contain review command shape: %s", usage)
 	}
+	if !strings.Contains(usage, "grapes --path-clean <path>") {
+		t.Fatalf("usage did not document path clean mode: %s", usage)
+	}
 	if !strings.Contains(usage, "--dependency-mode") {
 		t.Fatalf("usage did not document --dependency-mode: %s", usage)
 	}
@@ -211,6 +278,22 @@ func TestPrintUsageUsesNewCommandShape(t *testing.T) {
 	}
 	if strings.Contains(usage, "--lazy") {
 		t.Fatalf("usage should not mention --lazy: %s", usage)
+	}
+}
+
+func TestCleanPathListPreservesFirstOccurrenceAndDropsEmptyEntries(t *testing.T) {
+	got := cleanPathList("/bin::/usr/bin:/bin:/sbin:", ':')
+	want := "/bin:/usr/bin:/sbin"
+	if got != want {
+		t.Fatalf("cleanPathList() = %q, want %q", got, want)
+	}
+}
+
+func TestCleanPathListUsesWindowsSeparatorAndExactStringMatching(t *testing.T) {
+	got := cleanPathList(`C:\Bin;;C:\Tools;C:\Bin;c:\bin;`, ';')
+	want := `C:\Bin;C:\Tools;c:\bin`
+	if got != want {
+		t.Fatalf("cleanPathList() = %q, want %q", got, want)
 	}
 }
 
@@ -404,6 +487,9 @@ echo setup-fragment
 			if !strings.Contains(content, "GRAPES_OUTPUT_PATH") {
 				t.Fatalf("setup file missing injected globals: %q", content)
 			}
+			if strings.Contains(content, "--path-clean") {
+				t.Fatalf("setup file unexpectedly contained path clean tail: %q", content)
+			}
 			return nil
 		},
 	}); err != nil {
@@ -529,6 +615,7 @@ echo prompt
 	assertLineContainsFragments(t, content, "$env.GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("nushell", outputDir))
 	assertLineContainsFragments(t, content, "$env.PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env.PATH = ", "prepend", "/tool/bin")
+	assertLineContainsFragments(t, content, "^'", "--path-clean", "str join", "split row")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
 	assertLineExcludesFragments(t, content, "GRAPES_SHELL", "export ")
@@ -589,9 +676,71 @@ echo prompt
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUT_CACHE_DIR = ", "cache")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
+	assertLineContainsFragments(t, content, "$env:PATH = & ", "--path-clean", "$env:PATH")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
 	assertLineExcludesFragments(t, content, "GRAPES_SHELL", "export ")
+}
+
+func TestRunAppendsPathCleanTailToEnvAndMainOnly(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
+
+[[grape]]
+import = "setup"
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: env
+---
+export PROMPT_ENV=1
+---
+phase: main
+---
+echo prompt
+`)
+	writeTempFile(t, sourceDir, "setup.grape", `---
+phase: setup
+---
+echo setup
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	envContent := mustReadFile(t, filepath.Join(outputDir, "bashenv"))
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	setupContent := mustReadFile(t, filepath.Join(outputDir, "bash-setup"))
+
+	if got, want := strings.Count(envContent, "--path-clean"), 1; got != want {
+		t.Fatalf("bashenv path-clean count = %d, want %d; content=%q", got, want, envContent)
+	}
+	if got, want := strings.Count(mainContent, "--path-clean"), 1; got != want {
+		t.Fatalf("bashrc path-clean count = %d, want %d; content=%q", got, want, mainContent)
+	}
+	if strings.Contains(setupContent, "--path-clean") {
+		t.Fatalf("bash-setup unexpectedly contained path clean tail: %q", setupContent)
+	}
 }
 
 func TestRunEmitsGrapesShellOnlyInEnvOutput(t *testing.T) {
@@ -666,6 +815,8 @@ echo prompt
 	if strings.Contains(mainContent, "GRAPES_OUTPUT_PATH") {
 		t.Fatalf("zshrc unexpectedly contained GRAPES_OUTPUT_PATH: %q", mainContent)
 	}
+	assertLineContainsFragments(t, envContent, `export PATH="$("`, "--path-clean", `"$PATH")"`)
+	assertLineContainsFragments(t, mainContent, `export PATH="$("`, "--path-clean", `"$PATH")"`)
 }
 
 func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForNushell(t *testing.T) {
@@ -951,8 +1102,9 @@ echo prompt-fragment
 	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION"), 2; got != want {
 		t.Fatalf("cleanup count = %d, want %d; content=%q", got, want, content)
 	}
-	if !strings.HasSuffix(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION\n") {
-		t.Fatalf("bashrc did not end with scoped env cleanup: %q", content)
+	assertLineContainsFragments(t, content, `export PATH="$("`, "--path-clean", `"$PATH")"`)
+	if !strings.HasSuffix(content, expectedPathCleanLine("bash")) {
+		t.Fatalf("bashrc did not end with path clean tail: %q", content)
 	}
 }
 
@@ -1735,6 +1887,19 @@ func expectedInjectedPath(shellName string, path string) string {
 		return strings.ReplaceAll(path, `\`, "/")
 	default:
 		return path
+	}
+}
+
+func expectedPathCleanLine(shellName string) string {
+	switch shellName {
+	case "bash", "zsh":
+		return "\" --path-clean \"$PATH\")\"\n"
+	case "nushell":
+		return "split row (char esep))\n"
+	case "pwsh":
+		return "--path-clean $env:PATH\n"
+	default:
+		return ""
 	}
 }
 

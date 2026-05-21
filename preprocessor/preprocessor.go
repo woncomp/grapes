@@ -113,6 +113,20 @@ func InjectedEnvLines(shell string, outputPath string, homePath string) []string
 	}
 }
 
+func PathCleanInjectionLine(shell string, execPath string) (string, error) {
+	switch strings.ToLower(shell) {
+	case "bash", "zsh":
+		formattedPath := strings.ReplaceAll(execPath, `\`, "/")
+		return fmt.Sprintf(`export PATH="$(%s --path-clean "$PATH")"`, renderer.QuoteValue(shell, formattedPath)), nil
+	case "nushell":
+		return fmt.Sprintf(`$env.PATH = (^%s --path-clean ($env.PATH | str join (char esep)) | split row (char esep))`, renderer.QuoteValue(shell, execPath)), nil
+	case "pwsh":
+		return fmt.Sprintf(`$env:PATH = & %s --path-clean $env:PATH`, renderer.QuoteValue(shell, execPath)), nil
+	default:
+		return "", fmt.Errorf("unsupported shell %q", shell)
+	}
+}
+
 type blockState struct {
 	include   bool // whether content in this block should be included
 	satisfied bool // whether any branch has already matched
