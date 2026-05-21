@@ -8,8 +8,12 @@ import (
 // Process evaluates preprocessor directives in body for the given shell.
 // Supported directives: #ifdef, #ifndef, #elif, #else, #endif.
 func Process(body string, shell string) (string, error) {
-	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
-	output := []string{shellInjectionLine(shell)}
+	trimmedBody := strings.TrimRight(body, "\n")
+	var lines []string
+	if trimmedBody != "" {
+		lines = strings.Split(trimmedBody, "\n")
+	}
+	output := make([]string, 0, len(lines))
 	stack := []blockState{{include: true, satisfied: true}}
 
 	for i, line := range lines {
@@ -44,7 +48,7 @@ func Process(body string, shell string) (string, error) {
 	return strings.Join(output, "\n") + "\n", nil
 }
 
-func shellInjectionLine(shell string) string {
+func ShellInjectionLine(shell string) string {
 	switch strings.ToLower(shell) {
 	case "nushell":
 		return fmt.Sprintf(`$env.__GRAPES_SHELL = "%s"`, shell)

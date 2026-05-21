@@ -77,3 +77,37 @@ func TestZshLinkTargetsUsePOSIXInstallLines(t *testing.T) {
 		t.Fatalf("links[1].InstallLines[0] = %q, want %q", got, want)
 	}
 }
+
+func TestZshLinkTargetsRespectsZDOTDIRForZshrc(t *testing.T) {
+	home := t.TempDir()
+	zdotdir := filepath.Join(home, ".config", "zsh")
+	outputDir := filepath.Join(home, ".config", "grapes")
+
+	shell, err := Parse("zsh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	links, err := shell.LinkTargets(TargetContext{
+		GOOS: "linux",
+		LookupEnv: func(key string) (string, bool) {
+			switch key {
+			case "HOME":
+				return home, true
+			case "ZDOTDIR":
+				return zdotdir, true
+			default:
+				return "", false
+			}
+		},
+		OutputDir: outputDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := links[0].RCFile, filepath.Join(home, ".zshenv"); got != want {
+		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
+	}
+	if got, want := links[1].RCFile, filepath.Join(zdotdir, ".zshrc"); got != want {
+		t.Fatalf("links[1].RCFile = %q, want %q", got, want)
+	}
+}

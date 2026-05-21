@@ -6,14 +6,7 @@ import (
 )
 
 func shellLine(shell string) string {
-	switch shell {
-	case "nushell":
-		return `$env.__GRAPES_SHELL = "` + shell + `"` + "\n"
-	case "pwsh":
-		return `$env:__GRAPES_SHELL = "` + shell + `"` + "\n"
-	default:
-		return `export __GRAPES_SHELL="` + shell + `"` + "\n"
-	}
+	return ""
 }
 
 func TestNoDirectives(t *testing.T) {
@@ -29,13 +22,16 @@ func TestNoDirectives(t *testing.T) {
 }
 
 func TestShellInjection(t *testing.T) {
-	for _, shell := range []string{"bash", "zsh", "nushell", "pwsh"} {
-		result, err := Process("echo hi\n", shell)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.HasPrefix(result, shellLine(shell)) {
-			t.Errorf("output should start with shell-native injection %q, got: %q", shellLine(shell), result)
+	tests := map[string]string{
+		"bash":    `export __GRAPES_SHELL="bash"`,
+		"zsh":     `export __GRAPES_SHELL="zsh"`,
+		"nushell": `$env.__GRAPES_SHELL = "nushell"`,
+		"pwsh":    `$env:__GRAPES_SHELL = "pwsh"`,
+	}
+
+	for shell, want := range tests {
+		if got := ShellInjectionLine(shell); got != want {
+			t.Errorf("ShellInjectionLine(%q) = %q, want %q", shell, got, want)
 		}
 	}
 }

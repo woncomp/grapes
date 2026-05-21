@@ -47,12 +47,8 @@ func TestEmbeddedFragmentsValid(t *testing.T) {
 				}
 
 				for _, shell := range []string{"bash", "zsh"} {
-					out, err := preprocessor.Process(block.Body, shell)
-					if err != nil {
+					if _, err := preprocessor.Process(block.Body, shell); err != nil {
 						t.Errorf("block %d: preprocessing for %s failed: %v", i, shell, err)
-					}
-					if !strings.Contains(out, `__GRAPES_SHELL="`+shell+`"`) {
-						t.Errorf("block %d: preprocessor should inject __GRAPES_SHELL for %s", i, shell)
 					}
 				}
 			}

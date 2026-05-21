@@ -54,6 +54,11 @@ type runOptions struct {
 	color          bool
 }
 
+type linkReport struct {
+	status string
+	path   string
+}
+
 func main() {
 	opts, err := parseArgs(os.Args[1:], os.LookupEnv)
 	if err != nil {
@@ -296,6 +301,12 @@ func runWithOptions(opts runOptions) error {
 	for _, target := range opts.targets {
 		for _, phase := range outputPhases {
 			var shellFragments []writer.Fragment
+			if phase == shells.PhaseEnv {
+				shellFragments = append(shellFragments, writer.Fragment{
+					Name:    "__GRAPES_SHELL",
+					Content: preprocessor.ShellInjectionLine(target.Name()) + "\n",
+				})
+			}
 			for _, f := range sorted {
 				for _, block := range f.Blocks {
 					if block.Phase != phase {
@@ -332,6 +343,7 @@ func runWithOptions(opts runOptions) error {
 	}
 
 	fmt.Fprintf(stdout, "Generated rc files in %s for %s\n", outputDir, joinTargetNames(opts.targets))
+	printGeneratedFiles(stdout, managedOutputPaths(outputDir, outputs))
 
 	if opts.noLink {
 		return nil
@@ -342,6 +354,7 @@ func runWithOptions(opts runOptions) error {
 		LookupEnv: lookupEnv,
 		OutputDir: outputDir,
 	}
+	var linkReports []linkReport
 
 	for _, target := range opts.targets {
 		plan, err := previewShellLinkPlan(target, ctx)
@@ -357,6 +370,7 @@ func runWithOptions(opts runOptions) error {
 			if plan.hasChanges() {
 				fmt.Fprintf(stdout, "Skipped %s\n", target.Name())
 			}
+			linkReports = append(linkReports, summarizeLinkPlan(plan, false)...)
 			continue
 		}
 
@@ -369,7 +383,9 @@ func runWithOptions(opts runOptions) error {
 			}
 			fmt.Fprintf(stdout, "Installed source in %s\n", link.target.RCFile)
 		}
+		linkReports = append(linkReports, summarizeLinkPlan(plan, true)...)
 	}
+	printLinkFiles(stdout, linkReports)
 
 	return nil
 }
@@ -388,6 +404,47 @@ func joinTargetNames(targets []shells.Shell) string {
 		names = append(names, target.Name())
 	}
 	return strings.Join(names, ", ")
+}
+
+func managedOutputPaths(outputDir string, outputs []writer.OutputFile) []string {
+	paths := make([]string, 0, len(outputs))
+	for _, output := range outputs {
+		paths = append(paths, filepath.Join(outputDir, output.Filename))
+	}
+	return paths
+}
+
+func summarizeLinkPlan(plan shellLinkPlan, approved bool) []linkReport {
+	reports := make([]linkReport, 0, len(plan.links))
+	for _, link := range plan.links {
+		status := "unchanged"
+		if link.review.Changed {
+			if approved {
+				status = "linked"
+			} else {
+				status = "skipped"
+			}
+		}
+		reports = append(reports, linkReport{
+			status: status,
+			path:   link.target.RCFile,
+		})
+	}
+	return reports
+}
+
+func printGeneratedFiles(stdout io.Writer, paths []string) {
+	fmt.Fprintln(stdout, "Generated files:")
+	for _, path := range paths {
+		fmt.Fprintf(stdout, "- %s\n", path)
+	}
+}
+
+func printLinkFiles(stdout io.Writer, reports []linkReport) {
+	fmt.Fprintln(stdout, "Linked files:")
+	for _, report := range reports {
+		fmt.Fprintf(stdout, "- %s %s\n", report.status, report.path)
+	}
 }
 
 func pruneManagedOutputs(outputDir string, selectedTargets []shells.Shell) error {

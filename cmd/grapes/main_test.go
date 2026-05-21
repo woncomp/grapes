@@ -290,6 +290,59 @@ echo prompt
 	assertFileMissing(t, filepath.Join(home, ".zshrc"))
 }
 
+func TestRunNoLinkReportsGeneratedFilesWithFullPaths(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: env
+---
+export PROMPT_ENV=1
+---
+phase: main
+---
+echo prompt
+`)
+
+	target := mustParseShell(t, "zsh")
+	var stdout bytes.Buffer
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &stdout,
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	text := stdout.String()
+	for _, fragment := range []string{
+		"Generated files:",
+		filepath.Join(outputDir, "zshenv"),
+		filepath.Join(outputDir, "zshrc"),
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Fatalf("stdout = %q, want fragment %q", text, fragment)
+		}
+	}
+}
+
 func TestRunNoLinkRendersNushellEnvAndPathsNatively(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
@@ -402,6 +455,64 @@ echo prompt
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
 	assertLineExcludesFragments(t, content, "__GRAPES_SHELL", "export ")
+}
+
+func TestRunEmitsGrapesShellOnlyInEnvOutput(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - env-one
+  - env-two
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "env-one.grape", `---
+phase: env
+---
+export ONE=1
+`)
+	writeTempFile(t, sourceDir, "env-two.grape", `---
+phase: env
+---
+export TWO=2
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: main
+---
+echo prompt
+`)
+
+	target := mustParseShell(t, "zsh")
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	envContent := mustReadFile(t, filepath.Join(outputDir, "zshenv"))
+	if got, want := strings.Count(envContent, `__GRAPES_SHELL="zsh"`), 1; got != want {
+		t.Fatalf("env __GRAPES_SHELL count = %d, want %d; content=%q", got, want, envContent)
+	}
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "zshrc"))
+	if strings.Contains(mainContent, "__GRAPES_SHELL") {
+		t.Fatalf("zshrc unexpectedly contained __GRAPES_SHELL: %q", mainContent)
+	}
 }
 
 func TestRunNoLinkBuiltinsAvoidPosixSyntaxForNushell(t *testing.T) {
@@ -1068,6 +1179,16 @@ imports:
 	outputDir := expectedRunOutputDir(t, home, appData)
 	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
 	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+	text := stdout.String()
+	for _, fragment := range []string{
+		"Linked files:",
+		"linked " + filepath.Join(home, ".bashenv"),
+		"linked " + filepath.Join(home, ".bashrc"),
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Fatalf("stdout = %q, want fragment %q", text, fragment)
+		}
+	}
 }
 
 func TestRunReviewRejectSkipsAllLinks(t *testing.T) {
@@ -1089,13 +1210,14 @@ imports:
 `)
 
 	target := mustParseShell(t, "bash")
+	var stdout bytes.Buffer
 	if err := runWithOptions(runOptions{
 		masterPath:  masterPath,
 		targets:     []shells.Shell{target},
 		lookupEnv:   os.LookupEnv,
 		goos:        runtime.GOOS,
-		stdin:       strings.NewReader("n\n"),
-		stdout:      &bytes.Buffer{},
+		stdin:       strings.NewReader("y\nn\n"),
+		stdout:      &stdout,
 		interactive: true,
 	}); err != nil {
 		t.Fatal(err)
@@ -1103,6 +1225,16 @@ imports:
 
 	assertFileMissing(t, filepath.Join(home, ".bashenv"))
 	assertFileMissing(t, filepath.Join(home, ".bashrc"))
+	text := stdout.String()
+	for _, fragment := range []string{
+		"Linked files:",
+		"skipped " + filepath.Join(home, ".bashenv"),
+		"skipped " + filepath.Join(home, ".bashrc"),
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Fatalf("stdout = %q, want fragment %q", text, fragment)
+		}
+	}
 }
 
 func TestRunReviewSkipsPromptWhenAlreadyUpToDate(t *testing.T) {
@@ -1150,6 +1282,15 @@ imports:
 	}
 	if strings.Contains(stdout.String(), "Apply changes") {
 		t.Fatalf("stdout unexpectedly prompted: %q", stdout.String())
+	}
+	for _, fragment := range []string{
+		"Linked files:",
+		"unchanged " + filepath.Join(home, ".bashenv"),
+		"unchanged " + filepath.Join(home, ".bashrc"),
+	} {
+		if !strings.Contains(stdout.String(), fragment) {
+			t.Fatalf("stdout = %q, want fragment %q", stdout.String(), fragment)
+		}
 	}
 }
 

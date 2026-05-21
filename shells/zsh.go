@@ -3,6 +3,7 @@ package shells
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 type zshShell struct{}
@@ -33,6 +34,10 @@ func (z zshShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
 	if err != nil {
 		return nil, err
 	}
+	zdotdir := home
+	if value, ok := ctx.LookupEnv("ZDOTDIR"); ok && strings.TrimSpace(value) != "" {
+		zdotdir = value
+	}
 
 	return []LinkTarget{
 		{
@@ -42,7 +47,7 @@ func (z zshShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
 			},
 		},
 		{
-			RCFile: filepath.Join(home, ".zshrc"),
+			RCFile: filepath.Join(zdotdir, ".zshrc"),
 			InstallLines: []string{
 				fmt.Sprintf(`source "%s"`, posixPath(filepath.Join(ctx.OutputDir, z.ManagedFilename(PhaseMain)))),
 			},
