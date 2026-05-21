@@ -136,7 +136,7 @@ func TestDependencyPromptSupportsIgnoreWarnings(t *testing.T) {
 	if got, want := decision, dependencyActionAllowWarnings; got != want {
 		t.Fatalf("decision = %q, want %q", got, want)
 	}
-	if !strings.Contains(out.String(), "continue safely") || !strings.Contains(out.String(), "ignore warnings") {
+	if !strings.Contains(out.String(), "continue safely") || !strings.Contains(out.String(), "ignore warnings") || !strings.Contains(out.String(), "retry check") {
 		t.Fatalf("output = %q, want warning options", out.String())
 	}
 }
@@ -153,6 +153,22 @@ func TestDependencyPromptWithoutWarningsUsesYesNo(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, want := decision, dependencyActionSafe; got != want {
+		t.Fatalf("decision = %q, want %q", got, want)
+	}
+}
+
+func TestDependencyPromptSupportsRetry(t *testing.T) {
+	ui := reviewUI{
+		stdin:       strings.NewReader("r\n"),
+		stdout:      &bytes.Buffer{},
+		interactive: true,
+	}
+
+	decision, err := ui.chooseDependencyAction(dependencyModePrompt, []grapeDependencyResult{{Status: dependencyStatusWarning}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := decision, dependencyActionRetry; got != want {
 		t.Fatalf("decision = %q, want %q", got, want)
 	}
 }

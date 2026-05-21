@@ -364,12 +364,6 @@ func runWithOptions(opts runOptions) error {
 		return err
 	}
 
-	dependencyResults, err := checkGrapeDependencies(sorted, dependencyCheckOptions{lookupEnv: lookupEnv})
-	if err != nil {
-		return err
-	}
-	dependencyResultsByGrape := mapDependencyResultsByGrape(dependencyResults)
-
 	ui := reviewUI{
 		stdin:       opts.stdin,
 		stdout:      stdout,
@@ -377,19 +371,39 @@ func runWithOptions(opts runOptions) error {
 		color:       opts.color,
 		assumeYes:   opts.assumeYes,
 	}
-	allowWarnings := opts.dependencyMode == dependencyModeAllowWarnings
-	fmt.Fprint(stdout, renderDependencyTable(dependencyResults, allowWarnings))
-	action, err := ui.chooseDependencyAction(opts.dependencyMode, dependencyResults)
-	if err != nil {
-		return err
-	}
-	if action == dependencyActionCancel {
-		fmt.Fprintln(stdout, "Cancelled generation.")
-		return nil
+
+	resolved := sorted
+	var dependencyResults []grapeDependencyResult
+	var dependencyResultsByGrape map[string]grapeDependencyResult
+	allowedWarnings := false
+	for {
+		dependencyResults, err = checkGrapeDependencies(resolved, dependencyCheckOptions{lookupEnv: lookupEnv})
+		if err != nil {
+			return err
+		}
+		dependencyResultsByGrape = mapDependencyResultsByGrape(dependencyResults)
+
+		allowWarnings := opts.dependencyMode == dependencyModeAllowWarnings
+		fmt.Fprint(stdout, renderDependencyTable(dependencyResults, allowWarnings))
+		action, err := ui.chooseDependencyAction(opts.dependencyMode, dependencyResults)
+		if err != nil {
+			return err
+		}
+		switch action {
+		case dependencyActionRetry:
+			continue
+		case dependencyActionCancel:
+			fmt.Fprintln(stdout, "Cancelled generation.")
+			return nil
+		case dependencyActionAllowWarnings:
+			allowedWarnings = true
+		default:
+			allowedWarnings = false
+		}
+		break
 	}
 
-	allowedWarnings := action == dependencyActionAllowWarnings
-	sorted = filterRenderableGrapes(sorted, dependencyResults, allowedWarnings)
+	sorted = filterRenderableGrapes(resolved, dependencyResults, allowedWarnings)
 
 	type setupOutput struct {
 		shell shells.Shell
@@ -492,10 +506,9 @@ func runWithOptions(opts runOptions) error {
 		fmt.Fprintf(stdout, "Executed setup file %s\n", setupOutput.path)
 	}
 
-	fmt.Fprintf(stdout, "Generated rc files in %s for %s\n", outputDir, joinTargetNames(opts.targets))
-	printGeneratedFiles(stdout, managedOutputPaths(outputDir, outputs))
-
+	generatedPaths := managedOutputPaths(outputDir, outputs)
 	if opts.noLink {
+		printSummary(stdout, generatedPaths, nil)
 		return nil
 	}
 
@@ -535,7 +548,7 @@ func runWithOptions(opts runOptions) error {
 		}
 		linkReports = append(linkReports, summarizeLinkPlan(plan, true)...)
 	}
-	printLinkFiles(stdout, linkReports)
+	printSummary(stdout, generatedPaths, linkReports)
 
 	return nil
 }
@@ -586,15 +599,23 @@ func summarizeLinkPlan(plan shellLinkPlan, approved bool) []linkReport {
 func printGeneratedFiles(stdout io.Writer, paths []string) {
 	fmt.Fprintln(stdout, "Generated files:")
 	for _, path := range paths {
-		fmt.Fprintf(stdout, "- %s\n", path)
+		fmt.Fprintln(stdout, path)
 	}
 }
 
 func printLinkFiles(stdout io.Writer, reports []linkReport) {
 	fmt.Fprintln(stdout, "Linked files:")
 	for _, report := range reports {
-		fmt.Fprintf(stdout, "- %s %s\n", report.status, report.path)
+		fmt.Fprintln(stdout, report.path)
 	}
+}
+
+func printSummary(stdout io.Writer, generatedPaths []string, linkReports []linkReport) {
+	printGeneratedFiles(stdout, generatedPaths)
+	if len(linkReports) == 0 {
+		return
+	}
+	printLinkFiles(stdout, linkReports)
 }
 
 func filterRenderableGrapes(grapes []*parser.GrapeFile, results []grapeDependencyResult, allowWarnings bool) []*parser.GrapeFile {

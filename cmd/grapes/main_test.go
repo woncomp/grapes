@@ -561,6 +561,12 @@ echo prompt
 			t.Fatalf("stdout = %q, want fragment %q", text, fragment)
 		}
 	}
+	if strings.Contains(text, "Generated rc files in") {
+		t.Fatalf("stdout = %q, did not want early generated-files summary", text)
+	}
+	if strings.Contains(text, "- "+filepath.Join(outputDir, "zshenv")) {
+		t.Fatalf("stdout = %q, did not want bullet prefix", text)
+	}
 }
 
 func TestRunNoLinkRendersNushellEnvAndPathsNatively(t *testing.T) {
@@ -1229,6 +1235,57 @@ echo miss-fragment
 	}
 }
 
+func TestRunDependencyChecksPromptModeSupportsRetry(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	createExecutable(t, binDir, "warntool", "echo warntool unknown")
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
+`)
+	writeTempFile(t, sourceDir, "warn.grape", `---
+phase: main
+depend_executable:
+  binary: warntool
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+echo warn-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	var stdout bytes.Buffer
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader("r\ny\n"),
+		stdout:      &stdout,
+		interactive: true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	text := stdout.String()
+	if got := strings.Count(text, "GRAPE"); got < 2 {
+		t.Fatalf("stdout = %q, want dependency table rendered at least twice", text)
+	}
+	if !strings.Contains(text, "retry check") {
+		t.Fatalf("stdout = %q, want retry option", text)
+	}
+}
+
 func TestRunDependencyChecksAllowWarningsModeRendersWarnings(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
@@ -1589,11 +1646,14 @@ import = "prompt"
 	text := stdout.String()
 	for _, fragment := range []string{
 		"Linked files:",
-		"linked " + filepath.Join(home, ".bashrc"),
+		filepath.Join(home, ".bashrc"),
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("stdout = %q, want fragment %q", text, fragment)
 		}
+	}
+	if strings.Contains(text, "linked "+filepath.Join(home, ".bashrc")) {
+		t.Fatalf("stdout = %q, did not want link status prefix", text)
 	}
 }
 
@@ -1631,11 +1691,14 @@ import = "prompt"
 	text := stdout.String()
 	for _, fragment := range []string{
 		"Linked files:",
-		"skipped " + filepath.Join(home, ".bashrc"),
+		filepath.Join(home, ".bashrc"),
 	} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("stdout = %q, want fragment %q", text, fragment)
 		}
+	}
+	if strings.Contains(text, "skipped "+filepath.Join(home, ".bashrc")) {
+		t.Fatalf("stdout = %q, did not want link status prefix", text)
 	}
 }
 
@@ -1685,11 +1748,14 @@ import = "prompt"
 	}
 	for _, fragment := range []string{
 		"Linked files:",
-		"unchanged " + filepath.Join(home, ".bashrc"),
+		filepath.Join(home, ".bashrc"),
 	} {
 		if !strings.Contains(stdout.String(), fragment) {
 			t.Fatalf("stdout = %q, want fragment %q", stdout.String(), fragment)
 		}
+	}
+	if strings.Contains(stdout.String(), "unchanged "+filepath.Join(home, ".bashrc")) {
+		t.Fatalf("stdout = %q, did not want link status prefix", stdout.String())
 	}
 }
 

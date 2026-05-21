@@ -34,6 +34,7 @@ const (
 	dependencyActionCancel        dependencyAction = "cancel"
 	dependencyActionSafe          dependencyAction = "safe"
 	dependencyActionAllowWarnings dependencyAction = "allow_warnings"
+	dependencyActionRetry         dependencyAction = "retry"
 )
 
 func previewShellLinkPlan(target shells.Shell, ctx shells.TargetContext) (shellLinkPlan, error) {
@@ -188,10 +189,10 @@ func (ui *reviewUI) chooseDependencyAction(mode dependencyMode, results []grapeD
 	reader := ui.getReader()
 	for {
 		if hasWarnings {
-			fmt.Fprintln(stdout, "Dependency check options: [y] continue safely, [w] ignore warnings, [n] cancel")
-			fmt.Fprint(stdout, "Choose action [y/w/N]: ")
+			fmt.Fprintln(stdout, "Dependency check options: [y] continue safely, [w] ignore warnings, [r] retry check, [n] cancel")
+			fmt.Fprint(stdout, "Choose action [y/w/r/N]: ")
 		} else {
-			fmt.Fprint(stdout, "Continue with generation? [y/N]: ")
+			fmt.Fprint(stdout, "Continue with generation? [y/r/N]: ")
 		}
 		answer, err := reader.ReadString('\n')
 		if err != nil && err != io.EOF {
@@ -204,13 +205,15 @@ func (ui *reviewUI) chooseDependencyAction(mode dependencyMode, results []grapeD
 			if hasWarnings {
 				return dependencyActionAllowWarnings, nil
 			}
+		case "r":
+			return dependencyActionRetry, nil
 		case "", "n", "no":
 			return dependencyActionCancel, nil
 		}
 		if hasWarnings {
-			fmt.Fprintln(stdout, "Please answer y, w, or n.")
+			fmt.Fprintln(stdout, "Please answer y, w, r, or n.")
 		} else {
-			fmt.Fprintln(stdout, "Please answer y or n.")
+			fmt.Fprintln(stdout, "Please answer y, r, or n.")
 		}
 		if err == io.EOF {
 			return dependencyActionCancel, nil
