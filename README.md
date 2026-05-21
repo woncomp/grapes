@@ -16,11 +16,9 @@
 - Reduced duplication across Bash, Zsh, pwsh, and Nushell
 - A clearer separation between environment definition and shell-specific config details
 
-## Repository examples
+## Grape file authoring
 
-The repository keeps its example `.grape` and `.grapes` files in `docs/grapes`.
-
-`grapes` now resolves imports from the same directory as the input `.grapes` file only. It does not ship embedded built-in fragments, so example fragments in `docs/grapes` are documentation and local examples rather than runtime defaults baked into the binary.
+For `.grape` / `.grapes` format, phases, frontmatter, dependencies, generated Grapes variables, and authoring examples, see `docs/grapes/grape-file-reference.md`.
 
 ## Generated files and link targets by shell
 
@@ -37,11 +35,6 @@ When linking is enabled, `grapes` adds a managed marker block to the shell's nat
 | Zsh | `zshenv`, `zshrc` | `zshenv` is sourced from `~/.zshenv`; `zshrc` is sourced from `~/.zshrc` |
 | PowerShell (`powershell`, `pwsh`) | `powershell-env.ps1`, `powershell-profile.ps1` | Both files are dot-sourced from a single profile: on Unix-like systems `~/.config/powershell/Microsoft.PowerShell_profile.ps1`; on Windows `~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` |
 | Nushell (`nushell`, `nu`) | `nushell-env.nu`, `nushell-config.nu` | `nushell-env.nu` is `source-env`'d from `~/.config/nushell/env.nu` on Unix-like systems or `%APPDATA%\nushell\env.nu` on Windows; `nushell-config.nu` is sourced from `~/.config/nushell/config.nu` on Unix-like systems or `%APPDATA%\nushell\config.nu` on Windows |
-
-Generated env files also inject:
-
-- `GRAPES_SHELL`: the canonical target shell name (`bash`, `zsh`, `nushell`, or `pwsh`)
-- `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
 
 ## Disclaimer
 

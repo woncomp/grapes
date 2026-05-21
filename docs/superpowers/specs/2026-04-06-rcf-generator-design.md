@@ -6,86 +6,9 @@ Grapes is a Go CLI that generates managed shell rc files from composable fragmen
 
 The current implementation targets `bash` and `zsh`. A run can generate one or more selected shells and defaults to the current shell when no target is specified.
 
-## File Model
+## Grape file format reference
 
-There are two file types:
-
-- **`.grape`** — reusable fragment files.
-- **`.grapes`** — master files that declare the fragment import list and act as the CLI entry point.
-
-Fragments are **multi-block** documents. Each block has optional YAML frontmatter and an associated body. A file without leading frontmatter is treated as a single `main` block.
-
-### Block frontmatter
-
-```yaml
----
-deps: []          # first block only
-imports: []       # master files only; first block only
-phase: main       # env or main, default: main
-env: {}           # environment variables to export before the body
-paths: []         # PATH entries to prepend before the body
----
-```
-
-Field behavior:
-
-- `deps` is only accepted on the first block of a fragment.
-- `imports` is only meaningful on the first block of a master `.grapes` file.
-- `phase` controls whether the block contributes to the managed `env` file or the managed `main rc` file.
-- `env` expands into sorted `export KEY="VALUE"` lines before the body.
-- `paths` expands into ordered `export PATH="<entry>:$PATH"` lines before the body.
-
-Subsequent blocks may change `phase`, `env`, `paths`, and `body`, but not `deps` or `imports`.
-
-### Example fragment
-
-```yaml
----
-deps:
-  - path
-phase: env
-env:
-  GOPATH: "${GOPATH:-$HOME/go}"
-paths:
-  - $GOPATH/bin
----
-
----
-phase: main
-#ifdef BASH
-complete -C some-tool some-tool
-#endif
-
-#ifdef ZSH
-autoload -Uz compinit && compinit
-#endif
-```
-
-### Example master file
-
-```yaml
----
-imports:
-  - go
-  - prompt
-  - aliases
----
-```
-
-## Fragment Sources
-
-When Grapes resolves imports, it loads `<name>.grape` from the same directory as the input master file.
-
-The repository keeps example fragment sets in `docs/grapes`, including:
-
-- `go`
-- `fnm`
-- `uv`
-- `bun`
-- `zoxide`
-- `fzf`
-
-These files are examples checked into the repository, not embedded runtime defaults.
+For `.grape` / `.grapes` authoring details, frontmatter semantics, phase guidance, dependency fields, and generated Grapes variables, see `docs/grapes/grape-file-reference.md`.
 
 ## Processing Pipeline
 
@@ -110,8 +33,7 @@ master.grapes
 2. **Parser (`parser`)**
    - Parses `.grape` and `.grapes` files into `Fragment` values.
    - Supports multi-block documents.
-   - Validates `phase` values and enforces first-block-only rules for `deps` and `imports`.
-   - Expands first-class `env` and `paths` fields into shell code before preprocessing.
+   - Validates phase and frontmatter rules described in the grape authoring reference.
 
 3. **Dependency resolver (`resolver`)**
    - Traverses imports plus transitive dependencies.
@@ -121,7 +43,7 @@ master.grapes
 4. **Preprocessor (`preprocessor`)**
    - Evaluates `#ifdef`, `#ifndef`, `#elif`, `#else`, and `#endif` directives.
    - Rejects unknown `#...` directives.
-   - Injects `GRAPES_SHELL` plus `GRAPES_OUTPUT_PATH` at the top of each generated env file.
+   - Injects generated Grapes environment variables into managed env output.
 
 5. **Writer (`writer`)**
    - Writes selected output files into `~/.config/grapes/`.
@@ -142,17 +64,7 @@ master.grapes
 
 ## Preprocessor Rules
 
-Supported directives:
-
-- `#ifdef BASH`
-- `#ifdef ZSH`
-- `#ifndef BASH`
-- `#ifndef ZSH`
-- `#elif <shell>`
-- `#else`
-- `#endif`
-
-Content outside directives is emitted for all selected shells.
+Directive syntax and author-facing shell-condition guidance are documented in `docs/grapes/grape-file-reference.md`.
 
 Unknown `#...` lines are treated as invalid directives and produce an error with a line number.
 

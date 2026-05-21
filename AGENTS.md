@@ -33,8 +33,8 @@ The repository's `.goreleaser.yml` builds `./cmd/grapes` for `linux`, `darwin`, 
 
 ## Fragment authoring guidance
 
-Repository example fragments live in `./docs/grapes`.
+The single source of truth for `.grape` / `.grapes` authoring guidance is `./docs/grapes/grape-file-reference.md`.
 
-When adding or changing `.grape` fragments, prefer the `env` phase for instructions whose primary purpose is setting environment variables or initializing environment state that later commands depend on. Reserve the `main` phase for interactive shell behavior such as completions, aliases, prompts, and other non-environment startup logic.
+When you add or revise grape-file format guidance, fragment authoring guidance, frontmatter semantics, generated Grapes variables, or example authoring patterns, update that file instead of spreading the content across README files, specs, or other docs.
 
-When a fragment needs both phases, keep the blocks ordered as `main` first and `env` second. Do not put `env` before `main`.
+Other docs may link to the authoring reference, but they should not duplicate its grape-file authoring content.
