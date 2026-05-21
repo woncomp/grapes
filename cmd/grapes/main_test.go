@@ -290,6 +290,66 @@ echo prompt
 	assertFileMissing(t, filepath.Join(home, ".zshrc"))
 }
 
+func TestRunNoLinkPreservesPreviouslyGeneratedOtherShellOutputs(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: env
+---
+export PROMPT_ENV=1
+---
+phase: main
+---
+echo prompt
+`)
+
+	zsh := mustParseShell(t, "zsh")
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{zsh},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	bash := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{bash},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileExists(t, filepath.Join(outputDir, "zshenv"))
+	assertFileExists(t, filepath.Join(outputDir, "zshrc"))
+	assertFileExists(t, filepath.Join(outputDir, "bashenv"))
+	assertFileExists(t, filepath.Join(outputDir, "bashrc"))
+}
+
 func TestRunNoLinkReportsGeneratedFilesWithFullPaths(t *testing.T) {
 	home := t.TempDir()
 	appData := ""

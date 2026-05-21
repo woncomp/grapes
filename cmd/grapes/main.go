@@ -338,10 +338,6 @@ func runWithOptions(opts runOptions) error {
 		return err
 	}
 
-	if err := pruneManagedOutputs(outputDir, opts.targets); err != nil {
-		return err
-	}
-
 	fmt.Fprintf(stdout, "Generated rc files in %s for %s\n", outputDir, joinTargetNames(opts.targets))
 	printGeneratedFiles(stdout, managedOutputPaths(outputDir, outputs))
 
@@ -445,30 +441,6 @@ func printLinkFiles(stdout io.Writer, reports []linkReport) {
 	for _, report := range reports {
 		fmt.Fprintf(stdout, "- %s %s\n", report.status, report.path)
 	}
-}
-
-func pruneManagedOutputs(outputDir string, selectedTargets []shells.Shell) error {
-	selected := make(map[string]bool)
-	for _, target := range selectedTargets {
-		for _, phase := range outputPhases {
-			selected[target.ManagedFilename(phase)] = true
-		}
-	}
-
-	for _, target := range shells.Supported() {
-		for _, phase := range outputPhases {
-			filename := target.ManagedFilename(phase)
-			if selected[filename] {
-				continue
-			}
-			path := filepath.Join(outputDir, filename)
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf("removing stale managed output %s: %w", path, err)
-			}
-		}
-	}
-
-	return nil
 }
 
 func filterRenderableGrapes(grapes []*parser.GrapeFile, results []grapeDependencyResult, allowWarnings bool) []*parser.GrapeFile {
