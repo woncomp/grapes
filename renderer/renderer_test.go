@@ -45,6 +45,7 @@ func TestRenderGrapeExecScope(t *testing.T) {
 		shell    string
 		execPath string
 		execDir  string
+		version  string
 		want     string
 	}{
 		{
@@ -52,27 +53,37 @@ func TestRenderGrapeExecScope(t *testing.T) {
 			shell:    "bash",
 			execPath: `C:\tools\fnm\fnm.exe`,
 			execDir:  `C:\tools\fnm`,
-			want:     "export GRAPES_EXEC_PATH=\"C:/tools/fnm/fnm.exe\"\nexport GRAPES_EXEC_DIR=\"C:/tools/fnm\"\n",
+			version:  "1.2.3",
+			want:     "export GRAPES_EXEC_PATH=\"C:/tools/fnm/fnm.exe\"\nexport GRAPES_EXEC_DIR=\"C:/tools/fnm\"\nexport GRAPES_EXEC_VERSION=\"1.2.3\"\n",
 		},
 		{
 			name:     "nushell keeps raw paths",
 			shell:    "nushell",
 			execPath: `/opt/homebrew/bin/fnm`,
 			execDir:  `/opt/homebrew/bin`,
-			want:     "$env.GRAPES_EXEC_PATH = '/opt/homebrew/bin/fnm'\n$env.GRAPES_EXEC_DIR = '/opt/homebrew/bin'\n",
+			version:  "1.2.3",
+			want:     "$env.GRAPES_EXEC_PATH = '/opt/homebrew/bin/fnm'\n$env.GRAPES_EXEC_DIR = '/opt/homebrew/bin'\n$env.GRAPES_EXEC_VERSION = '1.2.3'\n",
 		},
 		{
 			name:     "pwsh keeps raw paths",
 			shell:    "pwsh",
 			execPath: `C:\tools\fnm\fnm.exe`,
 			execDir:  `C:\tools\fnm`,
-			want:     "$env:GRAPES_EXEC_PATH = 'C:\\tools\\fnm\\fnm.exe'\n$env:GRAPES_EXEC_DIR = 'C:\\tools\\fnm'\n",
+			version:  "1.2.3",
+			want:     "$env:GRAPES_EXEC_PATH = 'C:\\tools\\fnm\\fnm.exe'\n$env:GRAPES_EXEC_DIR = 'C:\\tools\\fnm'\n$env:GRAPES_EXEC_VERSION = '1.2.3'\n",
+		},
+		{
+			name:     "bash without version clears scoped value",
+			shell:    "bash",
+			execPath: `/opt/homebrew/bin/fnm`,
+			execDir:  `/opt/homebrew/bin`,
+			want:     "export GRAPES_EXEC_PATH=\"/opt/homebrew/bin/fnm\"\nexport GRAPES_EXEC_DIR=\"/opt/homebrew/bin\"\nunset GRAPES_EXEC_VERSION\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := RenderGrapeExecScope(tt.shell, tt.execPath, tt.execDir)
+			got, err := RenderGrapeExecScope(tt.shell, tt.execPath, tt.execDir, tt.version)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -88,10 +99,10 @@ func TestRenderGrapeExecCleanup(t *testing.T) {
 		shell string
 		want  string
 	}{
-		{shell: "bash", want: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n"},
-		{shell: "zsh", want: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n"},
-		{shell: "nushell", want: "hide-env GRAPES_EXEC_PATH\nhide-env GRAPES_EXEC_DIR\n"},
-		{shell: "pwsh", want: "Remove-Item Env:GRAPES_EXEC_PATH -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_DIR -ErrorAction SilentlyContinue\n"},
+		{shell: "bash", want: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION\n"},
+		{shell: "zsh", want: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION\n"},
+		{shell: "nushell", want: "hide-env GRAPES_EXEC_PATH\nhide-env GRAPES_EXEC_DIR\nhide-env GRAPES_EXEC_VERSION\n"},
+		{shell: "pwsh", want: "Remove-Item Env:GRAPES_EXEC_PATH -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_DIR -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_VERSION -ErrorAction SilentlyContinue\n"},
 	}
 
 	for _, tt := range tests {

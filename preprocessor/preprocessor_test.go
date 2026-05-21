@@ -71,6 +71,56 @@ func TestOutputPathInjection(t *testing.T) {
 	}
 }
 
+func TestOutputCacheDirInjection(t *testing.T) {
+	tests := []struct {
+		shell      string
+		outputPath string
+		want       string
+	}{
+		{
+			shell:      "bash",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `export GRAPES_OUT_CACHE_DIR="C:/Users/me/AppData/Roaming/grapes/cache"`,
+		},
+		{
+			shell:      "zsh",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `export GRAPES_OUT_CACHE_DIR="C:/Users/me/AppData/Roaming/grapes/cache"`,
+		},
+		{
+			shell:      "nushell",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `$env.GRAPES_OUT_CACHE_DIR = ($env.GRAPES_OUTPUT_PATH | path join "cache")`,
+		},
+		{
+			shell:      "pwsh",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `$env:GRAPES_OUT_CACHE_DIR = Join-Path $env:GRAPES_OUTPUT_PATH "cache"`,
+		},
+	}
+
+	for _, tt := range tests {
+		if got := OutputCacheDirInjectionLine(tt.shell, tt.outputPath); got != tt.want {
+			t.Errorf("OutputCacheDirInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
+		}
+	}
+}
+
+func TestEnsureOutputCacheDirLine(t *testing.T) {
+	tests := map[string]string{
+		"bash":    `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`,
+		"zsh":     `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`,
+		"nushell": `if not ($env.GRAPES_OUT_CACHE_DIR | path exists) { mkdir $env.GRAPES_OUT_CACHE_DIR }`,
+		"pwsh":    `if (-not (Test-Path -LiteralPath $env:GRAPES_OUT_CACHE_DIR)) { New-Item -ItemType Directory -Path $env:GRAPES_OUT_CACHE_DIR | Out-Null }`,
+	}
+
+	for shell, want := range tests {
+		if got := EnsureOutputCacheDirLine(shell); got != want {
+			t.Errorf("EnsureOutputCacheDirLine(%q) = %q, want %q", shell, got, want)
+		}
+	}
+}
+
 func TestIfdefMatch(t *testing.T) {
 	input := "#ifdef BASH\necho bash\n#endif\necho common\n"
 	result, err := Process(input, "bash")

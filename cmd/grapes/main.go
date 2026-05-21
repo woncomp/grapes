@@ -501,7 +501,7 @@ func renderGrapeScopePrefix(shell string, result grapeDependencyResult) (string,
 	if !ok {
 		return renderer.RenderGrapeExecCleanup(shell)
 	}
-	return renderer.RenderGrapeExecScope(shell, execPath, filepath.Dir(execPath))
+	return renderer.RenderGrapeExecScope(shell, execPath, filepath.Dir(execPath), grapeExecutableVersion(result))
 }
 
 func grapeExecutableLocation(result grapeDependencyResult) (string, bool) {
@@ -513,6 +513,17 @@ func grapeExecutableLocation(result grapeDependencyResult) (string, bool) {
 		return "", false
 	}
 	return path, true
+}
+
+func grapeExecutableVersion(result grapeDependencyResult) string {
+	if result.Grape == nil || result.Grape.DependExecutable == nil {
+		return ""
+	}
+	version := strings.TrimSpace(result.Version)
+	if version == "" || version == "n/a" || version == "unknown" {
+		return ""
+	}
+	return version
 }
 
 // parseAllGrapes loads the named .grape files referenced by the .grapes file.

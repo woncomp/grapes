@@ -16,8 +16,7 @@ zoxide init powershell | Out-String | Invoke-Expression
 
 #elif NUSHELL
 
-zoxide init nushell | save -f ~/.zoxide.nu
-source ~/.zoxide.nu
+source ~/.local/state/grapes/zoxide.nu
 
 #else
 

@@ -2,6 +2,7 @@ package preprocessor
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/woncomp/grapes/renderer"
@@ -76,10 +77,39 @@ func OutputPathInjectionLine(shell string, outputPath string) string {
 	}
 }
 
+func OutputCacheDirInjectionLine(shell string, outputPath string) string {
+	switch strings.ToLower(shell) {
+	case "bash", "zsh":
+		cacheDir := strings.ReplaceAll(filepath.Join(outputPath, "cache"), `\`, "/")
+		return fmt.Sprintf("export GRAPES_OUT_CACHE_DIR=%s", renderer.QuoteValue(shell, cacheDir))
+	case "nushell":
+		return `$env.GRAPES_OUT_CACHE_DIR = ($env.GRAPES_OUTPUT_PATH | path join "cache")`
+	case "pwsh":
+		return `$env:GRAPES_OUT_CACHE_DIR = Join-Path $env:GRAPES_OUTPUT_PATH "cache"`
+	default:
+		panic(fmt.Sprintf("unsupported shell %q", shell))
+	}
+}
+
+func EnsureOutputCacheDirLine(shell string) string {
+	switch strings.ToLower(shell) {
+	case "bash", "zsh":
+		return `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`
+	case "nushell":
+		return `if not ($env.GRAPES_OUT_CACHE_DIR | path exists) { mkdir $env.GRAPES_OUT_CACHE_DIR }`
+	case "pwsh":
+		return `if (-not (Test-Path -LiteralPath $env:GRAPES_OUT_CACHE_DIR)) { New-Item -ItemType Directory -Path $env:GRAPES_OUT_CACHE_DIR | Out-Null }`
+	default:
+		panic(fmt.Sprintf("unsupported shell %q", shell))
+	}
+}
+
 func InjectedEnvLines(shell string, outputPath string) []string {
 	return []string{
 		ShellInjectionLine(shell),
 		OutputPathInjectionLine(shell, outputPath),
+		OutputCacheDirInjectionLine(shell, outputPath),
+		EnsureOutputCacheDirLine(shell),
 	}
 }
 

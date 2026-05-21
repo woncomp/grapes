@@ -142,6 +142,24 @@ func TestFNMExampleUsesShellSpecificMainInit(t *testing.T) {
 	}
 }
 
+func TestZoxideExampleUsesCurrentShellSpecificInit(t *testing.T) {
+	frag, err := parser.ParseGrapeFile("zoxide.grape")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mainBody := fragmentBlockBody(t, frag, "main")
+	for _, want := range []string{
+		"init powershell",
+		`init $GRAPES_SHELL`,
+		"source ~/.local/state/grapes/zoxide.nu",
+	} {
+		if !strings.Contains(mainBody, want) {
+			t.Fatalf("main block did not contain %q; got %q", want, mainBody)
+		}
+	}
+}
+
 func fragmentBlockBody(t *testing.T, frag *parser.GrapeFile, phase string) string {
 	t.Helper()
 

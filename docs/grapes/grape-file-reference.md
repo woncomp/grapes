@@ -174,11 +174,13 @@ Generated `env` outputs inject:
 
 - `GRAPES_SHELL`: the canonical target shell name
 - `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
+- `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`, created by the generated env script if missing
 
 Executable-gated fragment scopes also inject:
 
 - `GRAPES_EXEC_PATH`: the resolved executable path for the current grape scope
 - `GRAPES_EXEC_DIR`: the parent directory of `GRAPES_EXEC_PATH`
+- `GRAPES_EXEC_VERSION`: the detected version string for the current executable dependency when available
 
 These scoped executable variables are set at the start of each rendered grape scope and cleaned up in the generated file cleanup section.
 

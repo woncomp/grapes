@@ -522,6 +522,8 @@ echo prompt
 	content := string(data)
 	assertLineContainsFragments(t, content, "$env:GRAPES_SHELL = ", "pwsh")
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("pwsh", outputDir))
+	assertLineContainsFragments(t, content, "$env:GRAPES_OUT_CACHE_DIR = ", "cache")
+	assertLineContainsFragments(t, content, "New-Item -ItemType Directory", "GRAPES_OUT_CACHE_DIR")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
@@ -584,6 +586,12 @@ echo prompt
 	if got, want := strings.Count(envContent, `GRAPES_OUTPUT_PATH="`+expectedInjectedOutputPath("zsh", outputDir)+`"`), 1; got != want {
 		t.Fatalf("env GRAPES_OUTPUT_PATH count = %d, want %d; content=%q", got, want, envContent)
 	}
+	if got, want := strings.Count(envContent, `GRAPES_OUT_CACHE_DIR="`+expectedInjectedOutputPath("zsh", outputDir)+`/cache"`), 1; got != want {
+		t.Fatalf("env GRAPES_OUT_CACHE_DIR count = %d, want %d; content=%q", got, want, envContent)
+	}
+	if !strings.Contains(envContent, `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`) {
+		t.Fatalf("zshenv missing cache dir creation: %q", envContent)
+	}
 	mainContent := mustReadFile(t, filepath.Join(outputDir, "zshrc"))
 	if strings.Contains(mainContent, "GRAPES_SHELL") {
 		t.Fatalf("zshrc unexpectedly contained GRAPES_SHELL: %q", mainContent)
@@ -604,6 +612,7 @@ func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForNushell(t *testing.T) {
 	createExecutable(t, binDir, "bun", "echo 1.2.0")
 	createExecutable(t, binDir, "fnm", "echo 1.39.0")
 	createExecutable(t, binDir, "uv", "echo uv 0.7.2")
+	createExecutable(t, binDir, "zoxide", "echo zoxide 0.9.4")
 	if runtime.GOOS == "windows" {
 		appData = t.TempDir()
 		t.Setenv("APPDATA", appData)
@@ -645,8 +654,11 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
+	assertLineContainsFragments(t, envContent, "$env.GRAPES_OUT_CACHE_DIR = ", "path join", "cache")
+	assertLineContainsFragments(t, envContent, "mkdir $env.GRAPES_OUT_CACHE_DIR", "path exists")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GRAPES_EXEC_DIR")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_PATH = ", "fnm")
+	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_VERSION = ", "1.39.0")
 	assertLineContainsFragments(t, envContent, "fnm env --json", "from json")
 	assertFileExcludes(t, mainContent, "fnm env")
 	assertFileExcludes(t, mainContent, "from json")
@@ -656,7 +668,7 @@ imports:
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertFileExcludes(t, combined, "generate-shell-completion nushell")
-	assertFileExcludes(t, combined, "zoxide init")
+	assertLineContainsFragments(t, mainContent, "source ~/.local/state/grapes/zoxide.nu")
 }
 
 func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForPwsh(t *testing.T) {
@@ -712,15 +724,18 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
+	assertLineContainsFragments(t, envContent, "$env:GRAPES_OUT_CACHE_DIR = ", "Join-Path", "cache")
+	assertLineContainsFragments(t, envContent, "New-Item -ItemType Directory", "GRAPES_OUT_CACHE_DIR")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "GRAPES_EXEC_DIR")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_PATH = ", "fnm")
+	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_VERSION = ", "1.39.0")
 	assertLineContainsFragments(t, envContent, "fnm env --shell powershell", "Invoke-Expression")
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertLineContainsFragments(t, mainContent, "$env:GRAPES_EXEC_PATH = ", "zoxide")
 	assertFileExcludes(t, mainContent, "FNM_PATH")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
-	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "init powershell")
+	assertLineContainsFragments(t, mainContent, "init powershell", "Invoke-Expression")
 }
 
 func TestRunDependencyChecksExecutableDependencyRendersWhenBinaryExists(t *testing.T) {
@@ -793,6 +808,9 @@ imports:
 phase: main
 depend_executable:
   binary: fnm
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
 echo fnm-fragment
 `)
@@ -821,13 +839,14 @@ echo prompt-fragment
 	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `export GRAPES_EXEC_PATH="`+strings.ReplaceAll(execPath, `\`, `/`)+`"`)
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `export GRAPES_EXEC_DIR="`+strings.ReplaceAll(filepath.Dir(execPath), `\`, `/`)+`"`)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `export GRAPES_EXEC_VERSION="1.39.0"`)
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== grape: fnm")
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== grape: prompt")
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== cleanup variables")
-	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR"), 2; got != want {
+	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION"), 2; got != want {
 		t.Fatalf("cleanup count = %d, want %d; content=%q", got, want, content)
 	}
-	if !strings.HasSuffix(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n") {
+	if !strings.HasSuffix(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION\n") {
 		t.Fatalf("bashrc did not end with scoped env cleanup: %q", content)
 	}
 }
