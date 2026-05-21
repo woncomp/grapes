@@ -16,6 +16,12 @@
 - Reduced duplication across Bash, Zsh, pwsh, and Nushell
 - A clearer separation between environment definition and shell-specific config details
 
+## Repository examples
+
+The repository keeps its example `.grape` and `.grapes` files in `docs/grapes`.
+
+`grapes` now resolves imports from the same directory as the input `.grapes` file only. It does not ship embedded built-in fragments, so example fragments in `docs/grapes` are documentation and local examples rather than runtime defaults baked into the binary.
+
 ## Generated files and link targets by shell
 
 Generated shell files are written to the managed output directory:

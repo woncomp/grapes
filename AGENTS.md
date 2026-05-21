@@ -9,8 +9,8 @@ The `grapes` CLI entry point lives at `./cmd/grapes`.
 Prefer `go run` so day-to-day testing does not leave build artifacts in the repository:
 
 ```bash
-go run ./cmd/grapes <source.grapes>
-go run ./cmd/grapes <source.grapes> -t zsh
+go run ./cmd/grapes ./docs/grapes/master.grapes
+go run ./cmd/grapes ./docs/grapes/master.grapes -t zsh
 ```
 
 ### Local executable builds
@@ -32,6 +32,8 @@ goreleaser release --snapshot --clean
 The repository's `.goreleaser.yml` builds `./cmd/grapes` for `linux`, `darwin`, and `windows` on `amd64` and `arm64`, packaging archives plus a SHA-256 checksum file.
 
 ## Fragment authoring guidance
+
+Repository example fragments live in `./docs/grapes`.
 
 When adding or changing `.grape` fragments, prefer the `env` phase for instructions whose primary purpose is setting environment variables or initializing environment state that later commands depend on. Reserve the `main` phase for interactive shell behavior such as completions, aliases, prompts, and other non-environment startup logic.
 

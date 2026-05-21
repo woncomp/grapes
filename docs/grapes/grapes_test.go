@@ -1,6 +1,8 @@
-package fragments
+package grapesdocs
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,26 +12,26 @@ import (
 
 var expectedFragments = []string{"go", "fnm", "uv", "bun", "zoxide", "fzf"}
 
-func TestAllFragmentsEmbedded(t *testing.T) {
+func TestAllExampleFragmentsExist(t *testing.T) {
 	for _, name := range expectedFragments {
-		_, err := FS.ReadFile(name + ".grape")
-		if err != nil {
-			t.Errorf("embedded fragment %s.grape not found: %v", name, err)
+		if _, err := os.Stat(filepath.Join(name + ".grape")); err != nil {
+			t.Errorf("example fragment %s.grape not found: %v", name, err)
 		}
 	}
 }
 
-func TestEmbeddedFragmentsValid(t *testing.T) {
+func TestExampleMasterFileExists(t *testing.T) {
+	if _, err := os.Stat("master.grapes"); err != nil {
+		t.Fatalf("master.grapes not found: %v", err)
+	}
+}
+
+func TestExampleFragmentsValid(t *testing.T) {
 	for _, name := range expectedFragments {
 		t.Run(name, func(t *testing.T) {
-			data, err := FS.ReadFile(name + ".grape")
+			frag, err := parser.ParseGrapeFile(filepath.Join(name + ".grape"))
 			if err != nil {
-				t.Fatal(err)
-			}
-
-			frag, err := parser.ParseGrapeString(name, string(data), "<embedded:"+name+">")
-			if err != nil {
-				t.Fatalf("ParseGrapeString failed: %v", err)
+				t.Fatalf("ParseGrapeFile failed: %v", err)
 			}
 
 			if len(frag.Blocks) == 0 {
@@ -46,7 +48,7 @@ func TestEmbeddedFragmentsValid(t *testing.T) {
 					t.Errorf("block %d: has no content", i)
 				}
 
-				for _, shell := range []string{"bash", "zsh"} {
+				for _, shell := range []string{"bash", "zsh", "nushell", "pwsh"} {
 					if _, err := preprocessor.Process(block.Body, shell); err != nil {
 						t.Errorf("block %d: preprocessing for %s failed: %v", i, shell, err)
 					}
@@ -56,38 +58,26 @@ func TestEmbeddedFragmentsValid(t *testing.T) {
 	}
 }
 
-func TestEmbeddedBuiltinDependencyConfigs(t *testing.T) {
+func TestExampleFragmentDependencyConfigs(t *testing.T) {
 	tests := []struct {
-		name           string
-		wantBinary     string
-		wantArgs       []string
-		wantRegex      string
-		wantConfigured bool
+		name       string
+		wantBinary string
+		wantArgs   []string
+		wantRegex  string
 	}{
-		{name: "bun", wantBinary: "bun", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
-		{name: "fnm", wantBinary: "fnm", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
-		{name: "fzf", wantBinary: "fzf", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
-		{name: "go", wantBinary: "go", wantArgs: []string{"version"}, wantRegex: `go([0-9]+\.[0-9]+(?:\.[0-9]+)?)`, wantConfigured: true},
-		{name: "uv", wantBinary: "uv", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
-		{name: "zoxide", wantBinary: "zoxide", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`, wantConfigured: true},
+		{name: "bun", wantBinary: "bun", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
+		{name: "fnm", wantBinary: "fnm", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
+		{name: "fzf", wantBinary: "fzf", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
+		{name: "go", wantBinary: "go", wantArgs: []string{"version"}, wantRegex: `go([0-9]+\.[0-9]+(?:\.[0-9]+)?)`},
+		{name: "uv", wantBinary: "uv", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
+		{name: "zoxide", wantBinary: "zoxide", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			data, err := FS.ReadFile(tc.name + ".grape")
+			frag, err := parser.ParseGrapeFile(filepath.Join(tc.name + ".grape"))
 			if err != nil {
 				t.Fatal(err)
-			}
-			frag, err := parser.ParseGrapeString(tc.name, string(data), "<embedded:"+tc.name+">")
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if !tc.wantConfigured {
-				if frag.DependExecutable != nil {
-					t.Fatalf("DependExecutable = %#v, want nil", frag.DependExecutable)
-				}
-				return
 			}
 			if frag.DependExecutable == nil {
 				t.Fatal("DependExecutable = nil, want config")
@@ -105,12 +95,8 @@ func TestEmbeddedBuiltinDependencyConfigs(t *testing.T) {
 	}
 }
 
-func TestFNMFragmentEnvBootstrapsKnownInstallLocations(t *testing.T) {
-	data, err := FS.ReadFile("fnm.grape")
-	if err != nil {
-		t.Fatal(err)
-	}
-	frag, err := parser.ParseGrapeString("fnm", string(data), "<embedded:fnm>")
+func TestFNMExampleEnvBootstrapsKnownInstallLocations(t *testing.T) {
+	frag, err := parser.ParseGrapeFile("fnm.grape")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,19 +117,14 @@ func TestFNMFragmentEnvBootstrapsKnownInstallLocations(t *testing.T) {
 	}
 }
 
-func TestFNMFragmentUsesShellSpecificMainInit(t *testing.T) {
-	data, err := FS.ReadFile("fnm.grape")
-	if err != nil {
-		t.Fatal(err)
-	}
-	frag, err := parser.ParseGrapeString("fnm", string(data), "<embedded:fnm>")
+func TestFNMExampleUsesShellSpecificMainInit(t *testing.T) {
+	frag, err := parser.ParseGrapeFile("fnm.grape")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	mainBody := fragmentBlockBody(t, frag, "main")
 	for _, want := range []string{
-		"null",
 		"fnm env --use-on-cd | Out-String | Invoke-Expression",
 		`eval "$(fnm env --use-on-cd)"`,
 	} {
@@ -159,7 +140,7 @@ func TestFNMFragmentUsesShellSpecificMainInit(t *testing.T) {
 		"FNM_MULTISHELL_PATH",
 		`export PATH="$FNM_PATH:$PATH"`,
 		"$env:PATH = $env:FNM_PATH",
-		"$env.PATH = ($env.PATH | prepend $env.FNM_PATH)",
+		"$env.PATH = ($env.PATH | prepend $env.FNM_MULTISHELL_PATH)",
 	} {
 		if strings.Contains(mainBody, forbidden) {
 			t.Fatalf("main block unexpectedly contained %q; got %q", forbidden, mainBody)

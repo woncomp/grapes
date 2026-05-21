@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,21 +70,4 @@ func ParseGrapeString(name, content, path string) (*GrapeFile, error) {
 	}
 
 	return grape, nil
-}
-
-func ParseEmbeddedGrape(dir, name string, embedFS embed.FS) (*GrapeFile, error) {
-	localPath := filepath.Join(dir, name+".grape")
-	data, err := os.ReadFile(localPath)
-	if err == nil {
-		return ParseGrapeString(name, string(data), localPath)
-	}
-	if !os.IsNotExist(err) {
-		return nil, fmt.Errorf("reading %s: %w", localPath, err)
-	}
-
-	embedData, embedErr := embedFS.ReadFile(name + ".grape")
-	if embedErr != nil {
-		return nil, fmt.Errorf("reading %s: %w", localPath, os.ErrNotExist)
-	}
-	return ParseGrapeString(name, string(embedData), "<embedded:"+name+">")
 }

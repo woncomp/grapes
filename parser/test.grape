@@ -1,5 +1,0 @@
----
-phase: env
-env:
-  EMBEDDED: "1"
----

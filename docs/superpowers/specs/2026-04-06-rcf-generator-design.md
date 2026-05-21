@@ -2,9 +2,9 @@
 
 ## Overview
 
-Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.grapes` file, Grapes loads the referenced `.grape` fragments, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.config/grapes/`, and optionally links the user's rc files back to those managed outputs.
+Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.grapes` file, Grapes loads the referenced `.grape` fragments from the same directory, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.config/grapes/`, and optionally links the user's rc files back to those managed outputs.
 
-The current implementation targets `bash` and `zsh`. A run can generate one or more selected shells, defaults to the current shell when no target is specified, and can source either local fragments or built-in embedded fragments.
+The current implementation targets `bash` and `zsh`. A run can generate one or more selected shells and defaults to the current shell when no target is specified.
 
 ## File Model
 
@@ -74,28 +74,25 @@ imports:
 
 ## Fragment Sources
 
-When Grapes resolves imports and dependencies, it loads fragments in this order:
+When Grapes resolves imports, it loads `<name>.grape` from the same directory as the input master file.
 
-1. A local `<name>.grape` file next to the master file.
-2. A built-in embedded fragment from `fragments/*.grape` if no local file exists.
-
-The repository currently embeds these curated fragments:
+The repository keeps example fragment sets in `docs/grapes`, including:
 
 - `go`
-- `nvm`
+- `fnm`
 - `uv`
 - `bun`
 - `zoxide`
 - `fzf`
 
-This gives local projects an override path while still shipping useful defaults.
+These files are examples checked into the repository, not embedded runtime defaults.
 
 ## Processing Pipeline
 
 ```text
 master.grapes
   -> parser.ParseFile
-  -> recursive fragment discovery (local first, embedded fallback)
+  -> same-directory fragment discovery
   -> resolver.Resolve
   -> preprocessor.Process per selected shell and block
   -> writer.Write managed files into ~/.config/grapes/
@@ -164,19 +161,19 @@ Unknown `#...` lines are treated as invalid directives and produce an error with
 ### Basic usage
 
 ```bash
-go run ./cmd/grapes <source.grapes>
+go run ./cmd/grapes ./docs/grapes/master.grapes
 ```
 
 ### Explicit targets
 
 ```bash
-go run ./cmd/grapes <source.grapes> -t zsh --target=bash
+go run ./cmd/grapes ./docs/grapes/master.grapes -t zsh --target=bash
 ```
 
 ### Generate without linking rc files
 
 ```bash
-go run ./cmd/grapes <source.grapes> --nolink
+go run ./cmd/grapes ./docs/grapes/master.grapes --nolink
 ```
 
 Behavior:
@@ -248,13 +245,13 @@ resolver/         dependency ordering and cycle detection
 preprocessor/     shell directive evaluation
 writer/           managed file output
 shells/           shell metadata and rc-file linking
-fragments/        embedded built-in `.grape` fragments
+docs/grapes/      example `.grape` and `.grapes` files
 docs/superpowers/ design spec and as-built plan
 ```
 
 ## Validation
 
-The repository validates this behavior with package-level Go tests across the CLI, parser, resolver, preprocessor, writer, shell integration, and embedded fragments:
+The repository validates this behavior with package-level Go tests across the CLI, parser, resolver, preprocessor, writer, shell integration, and repository example fragments:
 
 ```bash
 go test ./...

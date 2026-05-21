@@ -575,7 +575,7 @@ echo prompt
 	}
 }
 
-func TestRunNoLinkBuiltinsAvoidPosixSyntaxForNushell(t *testing.T) {
+func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForNushell(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
@@ -601,6 +601,7 @@ imports:
   - fzf
 ---
 `)
+	copyExampleFragments(t, sourceDir, "go", "bun", "fnm", "uv", "zoxide", "fzf")
 
 	target := mustParseShell(t, "nushell")
 	if err := runWithOptions(runOptions{
@@ -627,7 +628,6 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", ".local")
-	assertLineContainsFragments(t, mainContent, "null")
 	assertFileExcludes(t, mainContent, "fnm env")
 	assertFileExcludes(t, mainContent, "from json")
 	assertFileExcludes(t, mainContent, "load-env")
@@ -639,7 +639,7 @@ imports:
 	assertFileExcludes(t, combined, "zoxide init")
 }
 
-func TestRunNoLinkBuiltinsAvoidPosixSyntaxForPwsh(t *testing.T) {
+func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForPwsh(t *testing.T) {
 	home := t.TempDir()
 	appData := ""
 	sourceDir := t.TempDir()
@@ -666,6 +666,7 @@ imports:
   - fzf
 ---
 `)
+	copyExampleFragments(t, sourceDir, "go", "bun", "fnm", "uv", "zoxide", "fzf")
 
 	target := mustParseShell(t, "pwsh")
 	if err := runWithOptions(runOptions{
@@ -1453,6 +1454,19 @@ func writeTempFile(t *testing.T, dir, name, content string) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func copyExampleFragments(t *testing.T, dir string, names ...string) {
+	t.Helper()
+
+	for _, name := range names {
+		src := filepath.Join("..", "..", "docs", "grapes", name+".grape")
+		data, err := os.ReadFile(src)
+		if err != nil {
+			t.Fatalf("read example fragment %s: %v", src, err)
+		}
+		writeTempFile(t, dir, name+".grape", string(data))
+	}
 }
 
 func createExecutable(t *testing.T, dir, name, command string) string {

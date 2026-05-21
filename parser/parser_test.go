@@ -1,14 +1,10 @@
 package parser
 
 import (
-	"embed"
 	"os"
 	"path/filepath"
 	"testing"
 )
-
-//go:embed test.grape
-var testEmbedFS embed.FS
 
 func writeTempFile(t *testing.T, dir, name, content string) string {
 	t.Helper()

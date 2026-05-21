@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -139,7 +137,7 @@ func TestParseGrapeString(t *testing.T) {
 phase: env
 ---
 export FOO=bar
-`, "<embedded:test>")
+`, "<inline:test>")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,8 +148,8 @@ export FOO=bar
 	if got, want := grape.Blocks[0].Phase, "env"; got != want {
 		t.Fatalf("Phase = %q, want %q", got, want)
 	}
-	if !strings.HasPrefix(grape.Path, "<embedded:") {
-		t.Fatalf("Path = %q, want embedded path", grape.Path)
+	if got, want := grape.Path, "<inline:test>"; got != want {
+		t.Fatalf("Path = %q, want %q", got, want)
 	}
 }
 
@@ -164,7 +162,7 @@ paths:
   - /tool/bin
 ---
 echo raw
-`, "<embedded:test>")
+`, "<inline:test>")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,49 +176,6 @@ echo raw
 	}
 	if got, want := strings.TrimSpace(block.Body), "echo raw"; got != want {
 		t.Fatalf("Body = %q, want %q", got, want)
-	}
-}
-
-func TestParseEmbeddedGrapeLocalOverride(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "test.grape"), []byte(`---
-phase: env
-env:
-  LOCAL: "1"
----
-`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	grape, err := ParseEmbeddedGrape(dir, "test", testEmbedFS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := grape.Blocks[0].Env["LOCAL"], "1"; got != want {
-		t.Fatalf("LOCAL = %q, want %q", got, want)
-	}
-	if !strings.HasPrefix(grape.Path, dir) {
-		t.Fatalf("Path = %q, want local path", grape.Path)
-	}
-}
-
-func TestParseEmbeddedGrapeEmbeddedFallback(t *testing.T) {
-	grape, err := ParseEmbeddedGrape(t.TempDir(), "test", testEmbedFS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := grape.Blocks[0].Env["EMBEDDED"], "1"; got != want {
-		t.Fatalf("EMBEDDED = %q, want %q", got, want)
-	}
-	if !strings.HasPrefix(grape.Path, "<embedded:") {
-		t.Fatalf("Path = %q, want embedded path", grape.Path)
-	}
-}
-
-func TestParseEmbeddedGrapeNeitherExists(t *testing.T) {
-	_, err := ParseEmbeddedGrape(t.TempDir(), "nonexistent", testEmbedFS)
-	if err == nil {
-		t.Fatal("expected error, got nil")
 	}
 }
 
@@ -260,7 +215,7 @@ env:
 paths:
   - $TOOL/bin
 ---
-`, "<embedded:test>")
+`, "<inline:test>")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +243,7 @@ body1
 phase: main
 ---
 body2
-`, "<embedded:test>")
+`, "<inline:test>")
 	if err != nil {
 		t.Fatal(err)
 	}

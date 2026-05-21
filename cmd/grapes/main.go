@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/woncomp/grapes/fragments"
 	"github.com/woncomp/grapes/parser"
 	"github.com/woncomp/grapes/preprocessor"
 	"github.com/woncomp/grapes/renderer"
@@ -177,7 +176,7 @@ func addTarget(targets *[]shells.Shell, seen map[string]bool, raw string) error 
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--dependency-mode mode] [--yes] [--nolink]")
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Generate shell rc files from .grape fragments.")
+	fmt.Fprintln(w, "Generate shell rc files from local .grape fragments.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  -t, --target shell   Target shell to generate and link (repeatable; default: current shell)")
@@ -476,7 +475,7 @@ func parseAllGrapes(dir string, imports []string) ([]*parser.GrapeFile, error) {
 			continue
 		}
 		seen[name] = true
-		grape, err := parser.ParseEmbeddedGrape(dir, name, fragments.FS)
+		grape, err := parser.ParseGrapeFile(filepath.Join(dir, name+".grape"))
 		if err != nil {
 			return nil, err
 		}
