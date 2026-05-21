@@ -6,16 +6,10 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef NUSHELL
-fnm env --use-on-cd --shell bash
-| lines
-| where ($in | str starts-with "export ")
-| parse "export {key}=\"{value}\""
-| transpose -r
-| load-env
-$env.PATH = ($env.PATH | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
-#elif PWSH
+#ifdef PWSH
 fnm env --use-on-cd | Out-String | Invoke-Expression
+#elif NUSHELL
+
 #else
 eval "$(fnm env --use-on-cd)"
 #endif
@@ -23,54 +17,15 @@ eval "$(fnm env --use-on-cd)"
 ---
 phase: env
 ---
-#ifdef NUSHELL
-$env.FNM_PATH = (
-  if (($env.HOME | path join ".fnm") | path exists) {
-    ($env.HOME | path join ".fnm")
-  } else if (($env.XDG_DATA_HOME? | default "") != "" and (($env.XDG_DATA_HOME | path join "fnm") | path exists)) {
-    ($env.XDG_DATA_HOME | path join "fnm")
-  } else if (($env.HOME | path join "Library" "Application Support" "fnm") | path exists) {
-    ($env.HOME | path join "Library" "Application Support" "fnm")
-  } else if ("/opt/homebrew/opt/fnm/bin" | path exists) {
-    "/opt/homebrew/opt/fnm/bin"
-  } else if ("/usr/local/opt/fnm/bin" | path exists) {
-    "/usr/local/opt/fnm/bin"
-  } else if (($env.HOME | path join ".local" "share" "fnm") | path exists) {
-    ($env.HOME | path join ".local" "share" "fnm")
-  } else {
-    ""
-  }
-)
-if $env.FNM_PATH != "" {
-  $env.PATH = ($env.PATH | prepend $env.FNM_PATH)
-}
-fnm env --shell bash
-| lines
-| where ($in | str starts-with "export ")
-| parse "export {key}=\"{value}\""
-| transpose -r
-| load-env
-$env.PATH = ($env.PATH | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
-#elif PWSH
-if (Test-Path (Join-Path $HOME ".fnm")) {
-  $env:FNM_PATH = Join-Path $HOME ".fnm"
-} elseif ($env:XDG_DATA_HOME -and (Test-Path (Join-Path $env:XDG_DATA_HOME "fnm"))) {
-  $env:FNM_PATH = Join-Path $env:XDG_DATA_HOME "fnm"
-} elseif (Test-Path (Join-Path $HOME "Library/Application Support/fnm")) {
-  $env:FNM_PATH = Join-Path $HOME "Library/Application Support/fnm"
-} elseif (Test-Path "/opt/homebrew/opt/fnm/bin") {
-  $env:FNM_PATH = "/opt/homebrew/opt/fnm/bin"
-} elseif (Test-Path "/usr/local/opt/fnm/bin") {
-  $env:FNM_PATH = "/usr/local/opt/fnm/bin"
-} elseif (Test-Path (Join-Path (Join-Path (Join-Path $HOME ".local") "share") "fnm")) {
-  $env:FNM_PATH = Join-Path (Join-Path (Join-Path $HOME ".local") "share") "fnm"
-}
-if ($env:FNM_PATH) {
-  if (-not (($env:PATH -split [System.IO.Path]::PathSeparator) -contains $env:FNM_PATH)) {
-    $env:PATH = $env:FNM_PATH + [System.IO.Path]::PathSeparator + $env:PATH
-  }
-  fnm env | Out-String | Invoke-Expression
-}
+#ifdef PWSH
+
+fnm env --shell powershell | Out-String | Invoke-Expression
+
+#elif NUSHELL
+
+load-env (fnm env --json | from json)
+$env.PATH = ($env.PATH | prepend $env.FNM_MULTISHELL_PATH)
+
 #else
 if [ -d "$HOME/.fnm" ]; then
   FNM_PATH="$HOME/.fnm"

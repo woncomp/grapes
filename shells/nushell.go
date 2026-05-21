@@ -33,13 +33,13 @@ func (n nushellShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
 		{
 			RCFile: filepath.Join(configDir, "env.nu"),
 			InstallLines: []string{
-				fmt.Sprintf(`source-env "%s"`, targetPath(ctx.GOOS, ctx.OutputDir, n.ManagedFilename(PhaseEnv))),
+				fmt.Sprintf("source-env `%s`", targetPath(ctx.GOOS, ctx.OutputDir, n.ManagedFilename(PhaseEnv))),
 			},
 		},
 		{
 			RCFile: filepath.Join(configDir, "config.nu"),
 			InstallLines: []string{
-				fmt.Sprintf(`source "%s"`, targetPath(ctx.GOOS, ctx.OutputDir, n.ManagedFilename(PhaseMain))),
+				fmt.Sprintf("source `%s`", targetPath(ctx.GOOS, ctx.OutputDir, n.ManagedFilename(PhaseMain))),
 			},
 		},
 	}, nil

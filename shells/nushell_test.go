@@ -44,13 +44,13 @@ func TestNushellLinkTargetsWindows(t *testing.T) {
 	if got, want := links[0].RCFile, filepath.Join(`C:\Users\me\AppData\Roaming`, "nushell", "env.nu"); got != want {
 		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[0], `source-env "C:\Users\me\AppData\Roaming\grapes\nushell-env.nu"`; got != want {
+	if got, want := links[0].InstallLines[0], "source-env `C:\\Users\\me\\AppData\\Roaming\\grapes\\nushell-env.nu`"; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
 	if got, want := links[1].RCFile, filepath.Join(`C:\Users\me\AppData\Roaming`, "nushell", "config.nu"); got != want {
 		t.Fatalf("links[1].RCFile = %q, want %q", got, want)
 	}
-	if got, want := links[1].InstallLines[0], `source "C:\Users\me\AppData\Roaming\grapes\nushell-config.nu"`; got != want {
+	if got, want := links[1].InstallLines[0], "source `C:\\Users\\me\\AppData\\Roaming\\grapes\\nushell-config.nu`"; got != want {
 		t.Fatalf("links[1].InstallLines[0] = %q, want %q", got, want)
 	}
 }

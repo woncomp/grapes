@@ -9,10 +9,18 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef BASH
-eval "$(zoxide init bash)"
-#elif ZSH
-eval "$(zoxide init zsh)"
-#elif PWSH
+
+#ifdef PWSH
+
 zoxide init powershell | Out-String | Invoke-Expression
+
+#elif NUSHELL
+
+zoxide init nushell | save -f ~/.zoxide.nu
+source ~/.zoxide.nu
+
+#else
+
+eval "$(zoxide init $__GRAPES_SHELL)"
+
 #endif

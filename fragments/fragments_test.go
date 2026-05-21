@@ -131,7 +131,7 @@ func TestFNMFragmentEnvBootstrapsKnownInstallLocations(t *testing.T) {
 	}
 }
 
-func TestFNMFragmentUsesUseOnCdInAllMainShells(t *testing.T) {
+func TestFNMFragmentUsesShellSpecificMainInit(t *testing.T) {
 	data, err := FS.ReadFile("fnm.grape")
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestFNMFragmentUsesUseOnCdInAllMainShells(t *testing.T) {
 
 	mainBody := fragmentBlockBody(t, frag, "main")
 	for _, want := range []string{
-		"fnm env --use-on-cd --shell bash",
+		"null",
 		"fnm env --use-on-cd | Out-String | Invoke-Expression",
 		`eval "$(fnm env --use-on-cd)"`,
 	} {
@@ -153,6 +153,10 @@ func TestFNMFragmentUsesUseOnCdInAllMainShells(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"FNM_PATH",
+		"fnm env --json",
+		"from json",
+		"load-env",
+		"FNM_MULTISHELL_PATH",
 		`export PATH="$FNM_PATH:$PATH"`,
 		"$env:PATH = $env:FNM_PATH",
 		"$env.PATH = ($env.PATH | prepend $env.FNM_PATH)",

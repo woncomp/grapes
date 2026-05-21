@@ -147,8 +147,8 @@ Native targets:
 Install lines by phase:
 
 ```nu
-source-env "<managed-path>"
-source "<managed-path>"
+source-env `<managed-path>`
+source `<managed-path>`
 ```
 
 Mapping:
