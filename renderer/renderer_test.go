@@ -39,6 +39,74 @@ func TestRenderBlockPwsh(t *testing.T) {
 	}
 }
 
+func TestRenderGrapeExecScope(t *testing.T) {
+	tests := []struct {
+		name     string
+		shell    string
+		execPath string
+		execDir  string
+		want     string
+	}{
+		{
+			name:     "bash normalizes separators",
+			shell:    "bash",
+			execPath: `C:\tools\fnm\fnm.exe`,
+			execDir:  `C:\tools\fnm`,
+			want:     "export GRAPES_EXEC_PATH=\"C:/tools/fnm/fnm.exe\"\nexport GRAPES_EXEC_DIR=\"C:/tools/fnm\"\n",
+		},
+		{
+			name:     "nushell keeps raw paths",
+			shell:    "nushell",
+			execPath: `/opt/homebrew/bin/fnm`,
+			execDir:  `/opt/homebrew/bin`,
+			want:     "$env.GRAPES_EXEC_PATH = '/opt/homebrew/bin/fnm'\n$env.GRAPES_EXEC_DIR = '/opt/homebrew/bin'\n",
+		},
+		{
+			name:     "pwsh keeps raw paths",
+			shell:    "pwsh",
+			execPath: `C:\tools\fnm\fnm.exe`,
+			execDir:  `C:\tools\fnm`,
+			want:     "$env:GRAPES_EXEC_PATH = 'C:\\tools\\fnm\\fnm.exe'\n$env:GRAPES_EXEC_DIR = 'C:\\tools\\fnm'\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := RenderGrapeExecScope(tt.shell, tt.execPath, tt.execDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Fatalf("RenderGrapeExecScope() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRenderGrapeExecCleanup(t *testing.T) {
+	tests := []struct {
+		shell string
+		want  string
+	}{
+		{shell: "bash", want: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n"},
+		{shell: "zsh", want: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n"},
+		{shell: "nushell", want: "hide-env GRAPES_EXEC_PATH\nhide-env GRAPES_EXEC_DIR\n"},
+		{shell: "pwsh", want: "Remove-Item Env:GRAPES_EXEC_PATH -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_DIR -ErrorAction SilentlyContinue\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			got, err := RenderGrapeExecCleanup(tt.shell)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Fatalf("RenderGrapeExecCleanup() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRenderBlockNushell(t *testing.T) {
 	got, err := RenderBlock("linux", "nushell", map[string]string{
 		"FOO": "bar",

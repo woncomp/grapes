@@ -52,6 +52,44 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 	return strings.Join(lines, "\n") + "\n" + body, nil
 }
 
+func RenderGrapeExecScope(shell, execPath, execDir string) (string, error) {
+	switch shell {
+	case "bash", "zsh":
+		return fmt.Sprintf(
+			"export GRAPES_EXEC_PATH=%s\nexport GRAPES_EXEC_DIR=%s\n",
+			QuoteValue(shell, strings.ReplaceAll(execPath, `\`, "/")),
+			QuoteValue(shell, strings.ReplaceAll(execDir, `\`, "/")),
+		), nil
+	case "nushell":
+		return fmt.Sprintf(
+			"$env.GRAPES_EXEC_PATH = %s\n$env.GRAPES_EXEC_DIR = %s\n",
+			QuoteValue(shell, execPath),
+			QuoteValue(shell, execDir),
+		), nil
+	case "pwsh":
+		return fmt.Sprintf(
+			"$env:GRAPES_EXEC_PATH = %s\n$env:GRAPES_EXEC_DIR = %s\n",
+			QuoteValue(shell, execPath),
+			QuoteValue(shell, execDir),
+		), nil
+	default:
+		return "", fmt.Errorf("unsupported shell %q", shell)
+	}
+}
+
+func RenderGrapeExecCleanup(shell string) (string, error) {
+	switch shell {
+	case "bash", "zsh":
+		return "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n", nil
+	case "nushell":
+		return "hide-env GRAPES_EXEC_PATH\nhide-env GRAPES_EXEC_DIR\n", nil
+	case "pwsh":
+		return "Remove-Item Env:GRAPES_EXEC_PATH -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_DIR -ErrorAction SilentlyContinue\n", nil
+	default:
+		return "", fmt.Errorf("unsupported shell %q", shell)
+	}
+}
+
 func pwshPathSeparator(goos string) string {
 	if goos == "windows" {
 		return ";"

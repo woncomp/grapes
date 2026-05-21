@@ -134,6 +134,40 @@ func TestWriteSkipsDividerForInternalFragments(t *testing.T) {
 	}
 }
 
+func TestWriteAddsCleanupDividerForCleanupFragment(t *testing.T) {
+	dir := t.TempDir()
+
+	outputs := []OutputFile{
+		{
+			Filename: "bashrc",
+			Fragments: []Fragment{
+				{Name: "fnm", Content: "echo fnm\n"},
+				{Name: "__GRAPE_SCOPE_CLEANUP", Content: "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n"},
+			},
+		},
+	}
+
+	if err := Write(dir, outputs); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "bashrc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	if !strings.Contains(got, "# ==== cleanup variables") {
+		t.Fatalf("cleanup divider missing: %q", got)
+	}
+	if !strings.Contains(got, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n") {
+		t.Fatalf("cleanup content missing: %q", got)
+	}
+	if strings.Contains(got, "# ==== grape: __GRAPE_SCOPE_CLEANUP") {
+		t.Fatalf("cleanup fragment used grape divider: %q", got)
+	}
+}
+
 func TestWriteMkdirAllError(t *testing.T) {
 	outputs := []OutputFile{
 		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},

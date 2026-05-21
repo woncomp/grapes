@@ -95,7 +95,7 @@ func TestExampleFragmentDependencyConfigs(t *testing.T) {
 	}
 }
 
-func TestFNMExampleEnvBootstrapsKnownInstallLocations(t *testing.T) {
+func TestFNMExampleEnvUsesScopedExecLocation(t *testing.T) {
 	frag, err := parser.ParseGrapeFile("fnm.grape")
 	if err != nil {
 		t.Fatal(err)
@@ -103,13 +103,9 @@ func TestFNMExampleEnvBootstrapsKnownInstallLocations(t *testing.T) {
 
 	envBody := fragmentBlockBody(t, frag, "env")
 	for _, want := range []string{
-		"FNM_PATH",
-		"$HOME/.fnm",
-		"$XDG_DATA_HOME/fnm",
-		"$HOME/Library/Application Support/fnm",
-		"/opt/homebrew/opt/fnm/bin",
-		"/usr/local/opt/fnm/bin",
-		"$HOME/.local/share/fnm",
+		"GRAPES_EXEC_DIR",
+		`export PATH="$GRAPES_EXEC_DIR:$PATH"`,
+		"fnm env --shell",
 	} {
 		if !strings.Contains(envBody, want) {
 			t.Fatalf("env block did not contain %q; got %q", want, envBody)
@@ -133,14 +129,12 @@ func TestFNMExampleUsesShellSpecificMainInit(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
-		"FNM_PATH",
+		"GRAPES_EXEC_DIR",
+		"GRAPES_EXEC_PATH",
 		"fnm env --json",
 		"from json",
 		"load-env",
 		"FNM_MULTISHELL_PATH",
-		`export PATH="$FNM_PATH:$PATH"`,
-		"$env:PATH = $env:FNM_PATH",
-		"$env.PATH = ($env.PATH | prepend $env.FNM_MULTISHELL_PATH)",
 	} {
 		if strings.Contains(mainBody, forbidden) {
 			t.Fatalf("main block unexpectedly contained %q; got %q", forbidden, mainBody)

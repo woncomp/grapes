@@ -43,9 +43,13 @@ func Write(targetDir string, outputs []OutputFile) error {
 }
 
 func renderFragment(fragment Fragment) string {
-	if strings.TrimSpace(fragment.Name) == "" || strings.HasPrefix(fragment.Name, "__") {
+	name := strings.TrimSpace(fragment.Name)
+	switch {
+	case name == "__GRAPE_SCOPE_CLEANUP":
+		return fmt.Sprintf("\n# =============================================\n# ==== cleanup variables\n\n%s", fragment.Content)
+	case name == "" || strings.HasPrefix(name, "__"):
 		return fragment.Content
 	}
 
-	return fmt.Sprintf("\n# =============================================\n# ==== grape: %s\n\n%s", fragment.Name, fragment.Content)
+	return fmt.Sprintf("\n# =============================================\n# ==== grape: %s\n\n%s", name, fragment.Content)
 }

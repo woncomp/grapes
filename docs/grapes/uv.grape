@@ -18,11 +18,11 @@ uv generate-shell-completion powershell | Out-String | Invoke-Expression
 phase: env
 ---
 #ifdef BASH
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$GRAPES_EXEC_DIR:$PATH"
 #elif ZSH
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$GRAPES_EXEC_DIR:$PATH"
 #elif NUSHELL
-$env.PATH = ($env.PATH | prepend ($env.HOME | path join ".local" "bin"))
+$env.PATH = ($env.PATH | prepend $env.GRAPES_EXEC_DIR)
 #elif PWSH
-$env:PATH = (Join-Path (Join-Path $HOME ".local") "bin") + [System.IO.Path]::PathSeparator + $env:PATH
+$env:PATH = $env:GRAPES_EXEC_DIR + [System.IO.Path]::PathSeparator + $env:PATH
 #endif

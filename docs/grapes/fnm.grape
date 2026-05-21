@@ -27,24 +27,8 @@ load-env (fnm env --json | from json)
 $env.PATH = ($env.PATH | prepend $env.FNM_MULTISHELL_PATH)
 
 #else
-if [ -d "$HOME/.fnm" ]; then
-  FNM_PATH="$HOME/.fnm"
-elif [ -n "$XDG_DATA_HOME" ] && [ -d "$XDG_DATA_HOME/fnm" ]; then
-  FNM_PATH="$XDG_DATA_HOME/fnm"
-elif [ -d "$HOME/Library/Application Support/fnm" ]; then
-  FNM_PATH="$HOME/Library/Application Support/fnm"
-elif [ -d "/opt/homebrew/opt/fnm/bin" ]; then
-  FNM_PATH="/opt/homebrew/opt/fnm/bin"
-elif [ -d "/usr/local/opt/fnm/bin" ]; then
-  FNM_PATH="/usr/local/opt/fnm/bin"
-elif [ -d "$HOME/.local/share/fnm" ]; then
-  FNM_PATH="$HOME/.local/share/fnm"
-fi
-if [ -n "$FNM_PATH" ] && [ -d "$FNM_PATH" ]; then
-  case ":$PATH:" in
-    *":$FNM_PATH:"*) ;;
-    *) export PATH="$FNM_PATH:$PATH" ;;
-  esac
-  eval "$(fnm env)"
-fi
+
+export PATH="$GRAPES_EXEC_DIR:$PATH"
+eval "$(fnm env --shell $GRAPES_SHELL)"
+
 #endif

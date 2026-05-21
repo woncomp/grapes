@@ -274,6 +274,7 @@ func runWithOptions(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	dependencyResultsByGrape := mapDependencyResultsByGrape(dependencyResults)
 
 	ui := reviewUI{
 		stdin:       opts.stdin,
@@ -300,6 +301,7 @@ func runWithOptions(opts runOptions) error {
 	for _, target := range opts.targets {
 		for _, phase := range outputPhases {
 			var shellFragments []writer.Fragment
+			hasGrapeFragments := false
 			if phase == shells.PhaseEnv {
 				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir)
 				shellFragments = append(shellFragments, writer.Fragment{
@@ -308,6 +310,7 @@ func runWithOptions(opts runOptions) error {
 				})
 			}
 			for _, f := range sorted {
+				result := dependencyResultsByGrape[f.Name]
 				for _, block := range f.Blocks {
 					if block.Phase != phase {
 						continue
@@ -321,11 +324,29 @@ func runWithOptions(opts runOptions) error {
 					if err != nil {
 						return fmt.Errorf("preprocessing %s for %s: %w", f.Name, target.Name(), err)
 					}
+					if strings.TrimSpace(content) == "" {
+						continue
+					}
+					scopePrefix, err := renderGrapeScopePrefix(target.Name(), result)
+					if err != nil {
+						return fmt.Errorf("rendering grape scope for %s in %s: %w", f.Name, target.Name(), err)
+					}
 					shellFragments = append(shellFragments, writer.Fragment{
 						Name:    f.Name,
-						Content: content,
+						Content: scopePrefix + content,
 					})
+					hasGrapeFragments = true
 				}
+			}
+			if hasGrapeFragments {
+				scopeCleanup, err := renderer.RenderGrapeExecCleanup(target.Name())
+				if err != nil {
+					return fmt.Errorf("rendering grape scope cleanup for %s: %w", target.Name(), err)
+				}
+				shellFragments = append(shellFragments, writer.Fragment{
+					Name:    "__GRAPE_SCOPE_CLEANUP",
+					Content: scopeCleanup,
+				})
 			}
 			outputs = append(outputs, writer.OutputFile{
 				Filename:  target.ManagedFilename(phase),
@@ -465,6 +486,33 @@ func filterRenderableGrapes(grapes []*parser.GrapeFile, results []grapeDependenc
 		}
 	}
 	return filtered
+}
+
+func mapDependencyResultsByGrape(results []grapeDependencyResult) map[string]grapeDependencyResult {
+	byGrape := make(map[string]grapeDependencyResult, len(results))
+	for _, result := range results {
+		byGrape[result.Grape.Name] = result
+	}
+	return byGrape
+}
+
+func renderGrapeScopePrefix(shell string, result grapeDependencyResult) (string, error) {
+	execPath, ok := grapeExecutableLocation(result)
+	if !ok {
+		return renderer.RenderGrapeExecCleanup(shell)
+	}
+	return renderer.RenderGrapeExecScope(shell, execPath, filepath.Dir(execPath))
+}
+
+func grapeExecutableLocation(result grapeDependencyResult) (string, bool) {
+	if result.Grape == nil || result.Grape.DependExecutable == nil {
+		return "", false
+	}
+	path := strings.TrimSpace(result.Location)
+	if path == "" || path == "n/a" || path == "not found" {
+		return "", false
+	}
+	return path, true
 }
 
 // parseAllGrapes loads the named .grape files referenced by the .grapes file.

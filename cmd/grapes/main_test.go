@@ -645,7 +645,9 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
-	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", ".local")
+	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GRAPES_EXEC_DIR")
+	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_PATH = ", "fnm")
+	assertLineContainsFragments(t, envContent, "fnm env --json", "from json")
 	assertFileExcludes(t, mainContent, "fnm env")
 	assertFileExcludes(t, mainContent, "from json")
 	assertFileExcludes(t, mainContent, "load-env")
@@ -710,13 +712,15 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
-	assertLineContainsFragments(t, envContent, "$env:PATH = ", ".local", "$HOME")
+	assertLineContainsFragments(t, envContent, "$env:PATH = ", "GRAPES_EXEC_DIR")
+	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_PATH = ", "fnm")
+	assertLineContainsFragments(t, envContent, "fnm env --shell powershell", "Invoke-Expression")
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
-	assertLineContainsFragments(t, mainContent, "fnm env", "Invoke-Expression")
+	assertLineContainsFragments(t, mainContent, "$env:GRAPES_EXEC_PATH = ", "zoxide")
 	assertFileExcludes(t, mainContent, "FNM_PATH")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
-	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "zoxide init powershell")
+	assertLineContainsFragments(t, mainContent, "Invoke-Expression", "init powershell")
 }
 
 func TestRunDependencyChecksExecutableDependencyRendersWhenBinaryExists(t *testing.T) {
@@ -764,6 +768,68 @@ echo fnm-fragment
 
 	outputDir := expectedRunOutputDir(t, home, appData)
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "fnm-fragment")
+}
+
+func TestRunEmitsScopedExecEnvironmentPerGrapeAndCleansUpAtFileEnd(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	binDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", binDir)
+	execPath := createExecutable(t, binDir, "fnm", "echo 1.39.0")
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - fnm
+  - prompt
+---
+`)
+	writeTempFile(t, sourceDir, "fnm.grape", `---
+phase: main
+depend_executable:
+  binary: fnm
+---
+echo fnm-fragment
+`)
+	writeTempFile(t, sourceDir, "prompt.grape", `---
+phase: main
+---
+echo prompt-fragment
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &bytes.Buffer{},
+		interactive: false,
+		assumeYes:   true,
+		noLink:      true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	content := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `export GRAPES_EXEC_PATH="`+strings.ReplaceAll(execPath, `\`, `/`)+`"`)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `export GRAPES_EXEC_DIR="`+strings.ReplaceAll(filepath.Dir(execPath), `\`, `/`)+`"`)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== grape: fnm")
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== grape: prompt")
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== cleanup variables")
+	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR"), 2; got != want {
+		t.Fatalf("cleanup count = %d, want %d; content=%q", got, want, content)
+	}
+	if !strings.HasSuffix(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR\n") {
+		t.Fatalf("bashrc did not end with scoped env cleanup: %q", content)
+	}
 }
 
 func TestRunDependencyChecksExecutableDependencySkipsWhenBinaryMissing(t *testing.T) {
