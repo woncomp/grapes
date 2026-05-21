@@ -12,11 +12,30 @@ depend_executable:
 
 #ifdef PWSH
 
-zoxide init powershell | Out-String | Invoke-Expression
+. ~/.local/state/grapes/zoxide.ps1
 
 #elif NUSHELL
 
 source ~/.local/state/grapes/zoxide.nu
+
+#else
+
+eval "$(zoxide init $GRAPES_SHELL)"
+
+#endif
+
+---
+phase: setup
+---
+
+
+#ifdef PWSH
+
+& $env:GRAPES_EXEC_PATH init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1
+
+#elif NUSHELL
+
+zoxide init nushell | save -f ~/.local/state/grapes/zoxide.nu
 
 #else
 

@@ -19,6 +19,8 @@ func (pwshShell) ManagedFilename(phase string) string {
 	switch phase {
 	case PhaseEnv:
 		return "pwsh-env.ps1"
+	case PhaseSetup:
+		return "pwsh-setup.ps1"
 	default:
 		return "pwsh-profile.ps1"
 	}

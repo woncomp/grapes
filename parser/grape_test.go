@@ -113,6 +113,23 @@ body
 	}
 }
 
+func TestParseGrapeFileSetupPhase(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "setup.grape", `---
+phase: setup
+---
+echo setup
+`)
+
+	grape, err := ParseGrapeFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := grape.Blocks[0].Phase, "setup"; got != want {
+		t.Fatalf("Phase = %q, want %q", got, want)
+	}
+}
+
 func TestParseGrapeFileUnterminatedFrontmatter(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTempFile(t, dir, "bad.grape", `---

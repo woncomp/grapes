@@ -39,7 +39,7 @@ func TestExampleFragmentsValid(t *testing.T) {
 			}
 
 			for i, block := range frag.Blocks {
-				if block.Phase != "env" && block.Phase != "main" {
+				if block.Phase != "env" && block.Phase != "main" && block.Phase != "setup" {
 					t.Errorf("block %d: invalid phase %q", i, block.Phase)
 				}
 
@@ -150,12 +150,24 @@ func TestZoxideExampleUsesCurrentShellSpecificInit(t *testing.T) {
 
 	mainBody := fragmentBlockBody(t, frag, "main")
 	for _, want := range []string{
-		"init powershell",
+		"~/.local/state/grapes/zoxide.ps1",
 		`init $GRAPES_SHELL`,
 		"source ~/.local/state/grapes/zoxide.nu",
 	} {
 		if !strings.Contains(mainBody, want) {
 			t.Fatalf("main block did not contain %q; got %q", want, mainBody)
+		}
+	}
+
+	setupBody := fragmentBlockBody(t, frag, "setup")
+	for _, want := range []string{
+		"init powershell",
+		"& $env:GRAPES_EXEC_PATH",
+		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1",
+		"init nushell | save -f ~/.local/state/grapes/zoxide.nu",
+	} {
+		if !strings.Contains(setupBody, want) {
+			t.Fatalf("setup block did not contain %q; got %q", want, setupBody)
 		}
 	}
 }

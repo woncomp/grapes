@@ -25,7 +25,7 @@ echo hello
 ```yaml
 ---
 deps: []               # first block only
-phase: main            # env or main, default: main
+phase: main            # env, main, or setup; default: main
 env: {}                # environment variables rendered before the body
 paths: []              # PATH entries prepended before the body
 depend_executable: {}  # optional executable dependency check
@@ -69,12 +69,15 @@ Grapes has two phases:
 
 - `env`
 - `main`
+- `setup`
 
 Authoring guidance:
 
 - Prefer `env` for environment variables, PATH setup, and environment state that later commands depend on.
 - Reserve `main` for interactive shell behavior such as completions, aliases, prompts, and other non-environment startup logic.
+- Use `setup` for one-time initialization work that should run automatically right after generation but should not be linked into shell startup files.
 - When a fragment needs both phases, keep blocks ordered as `main` first and `env` second. Do not put `env` before `main`.
+- `setup` outputs are generated per target shell, executed once immediately after generation, and never linked into rc/profile files.
 
 ## Structured `env` and `paths`
 
@@ -174,7 +177,9 @@ Generated `env` outputs inject:
 
 - `GRAPES_SHELL`: the canonical target shell name
 - `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
-- `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`, created by the generated env script if missing
+- `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`
+
+During generation, the `grapes` executable creates both `GRAPES_OUT_CACHE_DIR` and `~/.local/state/grapes` before writing managed outputs. Generated shell files no longer emit mkdir logic for those directories.
 
 Executable-gated fragment scopes also inject:
 

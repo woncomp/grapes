@@ -91,25 +91,11 @@ func OutputCacheDirInjectionLine(shell string, outputPath string) string {
 	}
 }
 
-func EnsureOutputCacheDirLine(shell string) string {
-	switch strings.ToLower(shell) {
-	case "bash", "zsh":
-		return `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`
-	case "nushell":
-		return `if not ($env.GRAPES_OUT_CACHE_DIR | path exists) { mkdir $env.GRAPES_OUT_CACHE_DIR }`
-	case "pwsh":
-		return `if (-not (Test-Path -LiteralPath $env:GRAPES_OUT_CACHE_DIR)) { New-Item -ItemType Directory -Path $env:GRAPES_OUT_CACHE_DIR | Out-Null }`
-	default:
-		panic(fmt.Sprintf("unsupported shell %q", shell))
-	}
-}
-
 func InjectedEnvLines(shell string, outputPath string) []string {
 	return []string{
 		ShellInjectionLine(shell),
 		OutputPathInjectionLine(shell, outputPath),
 		OutputCacheDirInjectionLine(shell, outputPath),
-		EnsureOutputCacheDirLine(shell),
 	}
 }
 

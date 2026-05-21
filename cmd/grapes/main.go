@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -18,8 +19,9 @@ import (
 )
 
 var (
-	errHelpRequested = errors.New("help requested")
-	outputPhases     = []string{shells.PhaseEnv, shells.PhaseMain}
+	errHelpRequested    = errors.New("help requested")
+	outputPhases        = []string{shells.PhaseEnv, shells.PhaseMain, shells.PhaseSetup}
+	defaultExecuteSetup = executeManagedSetup
 )
 
 type dependencyMode string
@@ -51,6 +53,7 @@ type runOptions struct {
 	stdout         io.Writer
 	interactive    bool
 	color          bool
+	executeSetup   func(shells.Shell, string) error
 }
 
 type linkReport struct {
@@ -202,6 +205,37 @@ func managedOutputDir(goos string, lookupEnv func(string) (string, bool)) (strin
 	return filepath.Join(home, ".config", "grapes"), nil
 }
 
+func userHomeDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
+	keys := []string{"HOME"}
+	if goos == "windows" {
+		keys = []string{"HOME", "USERPROFILE"}
+	}
+	for _, key := range keys {
+		if value, ok := lookupEnv(key); ok && strings.TrimSpace(value) != "" {
+			return value, nil
+		}
+	}
+	return "", fmt.Errorf("home directory environment variable not set")
+}
+
+func ensureRuntimeDirs(goos string, lookupEnv func(string) (string, bool), outputDir string) error {
+	home, err := userHomeDir(goos, lookupEnv)
+	if err != nil {
+		return err
+	}
+
+	dirs := []string{
+		filepath.Join(outputDir, "cache"),
+		filepath.Join(home, ".local", "state", "grapes"),
+	}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("creating runtime directory %s: %w", dir, err)
+		}
+	}
+	return nil
+}
+
 func run(masterPath string, targets []shells.Shell, noLink bool) error {
 	return runWithOptions(runOptions{
 		masterPath:     masterPath,
@@ -240,6 +274,10 @@ func runWithOptions(opts runOptions) error {
 	if opts.dependencyMode == "" {
 		opts.dependencyMode = dependencyModePrompt
 	}
+	executeSetup := opts.executeSetup
+	if executeSetup == nil {
+		executeSetup = defaultExecuteSetup
+	}
 
 	outputDir, err := managedOutputDir(opts.goos, lookupEnv)
 	if err != nil {
@@ -248,6 +286,9 @@ func runWithOptions(opts runOptions) error {
 
 	if filepath.Ext(opts.masterPath) != ".grapes" {
 		return fmt.Errorf("%s is not a .grapes file", opts.masterPath)
+	}
+	if err := ensureRuntimeDirs(opts.goos, lookupEnv, outputDir); err != nil {
+		return err
 	}
 
 	grapesFile, err := parser.ParseGrapesFile(opts.masterPath)
@@ -297,7 +338,13 @@ func runWithOptions(opts runOptions) error {
 	allowedWarnings := action == dependencyActionAllowWarnings
 	sorted = filterRenderableGrapes(sorted, dependencyResults, allowedWarnings)
 
+	type setupOutput struct {
+		shell shells.Shell
+		path  string
+	}
+
 	var outputs []writer.OutputFile
+	var setupOutputs []setupOutput
 	for _, target := range opts.targets {
 		for _, phase := range outputPhases {
 			var shellFragments []writer.Fragment
@@ -338,6 +385,16 @@ func runWithOptions(opts runOptions) error {
 					hasGrapeFragments = true
 				}
 			}
+			if phase == shells.PhaseSetup {
+				if !hasGrapeFragments {
+					continue
+				}
+				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir)
+				shellFragments = append([]writer.Fragment{{
+					Name:    "__GRAPE_ENV",
+					Content: strings.Join(injectedLines, "\n") + "\n",
+				}}, shellFragments...)
+			}
 			if hasGrapeFragments {
 				scopeCleanup, err := renderer.RenderGrapeExecCleanup(target.Name())
 				if err != nil {
@@ -348,15 +405,28 @@ func runWithOptions(opts runOptions) error {
 					Content: scopeCleanup,
 				})
 			}
+			filename := target.ManagedFilename(phase)
 			outputs = append(outputs, writer.OutputFile{
-				Filename:  target.ManagedFilename(phase),
+				Filename:  filename,
 				Fragments: shellFragments,
 			})
+			if phase == shells.PhaseSetup {
+				setupOutputs = append(setupOutputs, setupOutput{
+					shell: target,
+					path:  filepath.Join(outputDir, filename),
+				})
+			}
 		}
 	}
 
 	if err := writer.Write(outputDir, outputs); err != nil {
 		return err
+	}
+	for _, setupOutput := range setupOutputs {
+		if err := executeSetup(setupOutput.shell, setupOutput.path); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Executed setup file %s\n", setupOutput.path)
 	}
 
 	fmt.Fprintf(stdout, "Generated rc files in %s for %s\n", outputDir, joinTargetNames(opts.targets))
@@ -524,6 +594,32 @@ func grapeExecutableVersion(result grapeDependencyResult) string {
 		return ""
 	}
 	return version
+}
+
+func executeManagedSetup(shell shells.Shell, scriptPath string) error {
+	var cmd *exec.Cmd
+	switch shell.Name() {
+	case "bash":
+		cmd = exec.Command("bash", scriptPath)
+	case "zsh":
+		cmd = exec.Command("zsh", scriptPath)
+	case "nushell":
+		cmd = exec.Command("nu", scriptPath)
+	case "pwsh":
+		cmd = exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-File", scriptPath)
+	default:
+		return fmt.Errorf("unsupported setup shell %q", shell.Name())
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		trimmed := strings.TrimSpace(string(output))
+		if trimmed == "" {
+			return fmt.Errorf("executing setup file %s: %w", scriptPath, err)
+		}
+		return fmt.Errorf("executing setup file %s: %w\n%s", scriptPath, err, trimmed)
+	}
+	return nil
 }
 
 // parseAllGrapes loads the named .grape files referenced by the .grapes file.

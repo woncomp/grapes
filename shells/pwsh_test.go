@@ -13,6 +13,9 @@ func TestPwshManagedFilename(t *testing.T) {
 	if got, want := shell.ManagedFilename(PhaseMain), "pwsh-profile.ps1"; got != want {
 		t.Fatalf("ManagedFilename(main) = %q, want %q", got, want)
 	}
+	if got, want := shell.ManagedFilename(PhaseSetup), "pwsh-setup.ps1"; got != want {
+		t.Fatalf("ManagedFilename(setup) = %q, want %q", got, want)
+	}
 }
 
 func TestPwshLinkTargetsUnix(t *testing.T) {

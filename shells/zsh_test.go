@@ -16,6 +16,9 @@ func TestZshManagedFilename(t *testing.T) {
 	if got, want := shell.ManagedFilename(PhaseMain), "zshrc"; got != want {
 		t.Fatalf("ManagedFilename(main) = %q, want %q", got, want)
 	}
+	if got, want := shell.ManagedFilename(PhaseSetup), "zsh-setup"; got != want {
+		t.Fatalf("ManagedFilename(setup) = %q, want %q", got, want)
+	}
 }
 
 func TestZshLinkTargets(t *testing.T) {

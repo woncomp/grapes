@@ -17,6 +17,9 @@ func TestBashManagedFilename(t *testing.T) {
 	if got, want := shell.ManagedFilename(PhaseMain), "bashrc"; got != want {
 		t.Fatalf("ManagedFilename(main) = %q, want %q", got, want)
 	}
+	if got, want := shell.ManagedFilename(PhaseSetup), "bash-setup"; got != want {
+		t.Fatalf("ManagedFilename(setup) = %q, want %q", got, want)
+	}
 }
 
 func TestBashLinkTargetsPreferBashProfile(t *testing.T) {

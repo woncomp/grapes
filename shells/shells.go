@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	PhaseEnv  = "env"
-	PhaseMain = "main"
+	PhaseEnv   = "env"
+	PhaseMain  = "main"
+	PhaseSetup = "setup"
 
 	markerStart = "# >>> grapes >>>"
 	markerEnd   = "# <<< grapes <<<"

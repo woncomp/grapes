@@ -16,6 +16,9 @@ func TestNushellManagedFilename(t *testing.T) {
 	if got, want := shell.ManagedFilename(PhaseMain), "nushell-config.nu"; got != want {
 		t.Fatalf("ManagedFilename(main) = %q, want %q", got, want)
 	}
+	if got, want := shell.ManagedFilename(PhaseSetup), "nushell-setup.nu"; got != want {
+		t.Fatalf("ManagedFilename(setup) = %q, want %q", got, want)
+	}
 }
 
 func TestNushellLinkTargetsWindows(t *testing.T) {

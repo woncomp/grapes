@@ -10,7 +10,7 @@ import (
 
 // Block represents one frontmatter+body section within a .grape file.
 type Block struct {
-	Phase string            // "env" or "main"
+	Phase string            // "env", "main", or "setup"
 	Env   map[string]string // first-class env vars
 	Paths []string          // first-class PATH entries
 	Body  string            // raw block content
@@ -98,8 +98,8 @@ func parseBlock(rb rawBlock, index int, path string) (Block, frontmatter, error)
 	if phase == "" {
 		phase = "main"
 	}
-	if phase != "env" && phase != "main" {
-		return Block{}, frontmatter{}, fmt.Errorf("invalid phase %q in block %d of %s (must be \"env\" or \"main\")", phase, index+1, path)
+	if phase != "env" && phase != "main" && phase != "setup" {
+		return Block{}, frontmatter{}, fmt.Errorf("invalid phase %q in block %d of %s (must be \"env\", \"main\", or \"setup\")", phase, index+1, path)
 	}
 
 	return Block{

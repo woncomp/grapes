@@ -24,6 +24,8 @@ func (zshShell) ManagedFilename(phase string) string {
 	switch phase {
 	case PhaseEnv:
 		return "zshenv"
+	case PhaseSetup:
+		return "zsh-setup"
 	default:
 		return "zshrc"
 	}

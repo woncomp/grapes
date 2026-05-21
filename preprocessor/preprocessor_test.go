@@ -106,21 +106,6 @@ func TestOutputCacheDirInjection(t *testing.T) {
 	}
 }
 
-func TestEnsureOutputCacheDirLine(t *testing.T) {
-	tests := map[string]string{
-		"bash":    `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`,
-		"zsh":     `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`,
-		"nushell": `if not ($env.GRAPES_OUT_CACHE_DIR | path exists) { mkdir $env.GRAPES_OUT_CACHE_DIR }`,
-		"pwsh":    `if (-not (Test-Path -LiteralPath $env:GRAPES_OUT_CACHE_DIR)) { New-Item -ItemType Directory -Path $env:GRAPES_OUT_CACHE_DIR | Out-Null }`,
-	}
-
-	for shell, want := range tests {
-		if got := EnsureOutputCacheDirLine(shell); got != want {
-			t.Errorf("EnsureOutputCacheDirLine(%q) = %q, want %q", shell, got, want)
-		}
-	}
-}
-
 func TestIfdefMatch(t *testing.T) {
 	input := "#ifdef BASH\necho bash\n#endif\necho common\n"
 	result, err := Process(input, "bash")

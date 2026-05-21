@@ -12,6 +12,12 @@ import (
 	"github.com/woncomp/grapes/shells"
 )
 
+func init() {
+	defaultExecuteSetup = func(shells.Shell, string) error {
+		return nil
+	}
+}
+
 func TestParseArgsUsesExplicitTargets(t *testing.T) {
 	opts, err := parseArgs([]string{"master.grapes", "-t", "zsh", "--target=bash", "--nolink"}, func(string) (string, bool) {
 		return "", false
@@ -286,6 +292,7 @@ echo prompt
 	assertFileExists(t, filepath.Join(outputDir, "zshrc"))
 	assertFileMissing(t, filepath.Join(outputDir, "bashenv"))
 	assertFileMissing(t, filepath.Join(outputDir, "bashrc"))
+	assertFileMissing(t, filepath.Join(outputDir, "bash-setup"))
 	assertFileMissing(t, filepath.Join(home, ".zshenv"))
 	assertFileMissing(t, filepath.Join(home, ".zshrc"))
 
@@ -358,6 +365,71 @@ echo prompt
 	assertFileExists(t, filepath.Join(outputDir, "zshrc"))
 	assertFileExists(t, filepath.Join(outputDir, "bashenv"))
 	assertFileExists(t, filepath.Join(outputDir, "bashrc"))
+}
+
+func TestRunExecutesSetupPhaseOnceWithoutLinking(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
+imports:
+  - setup
+---
+`)
+	writeTempFile(t, sourceDir, "setup.grape", `---
+phase: setup
+---
+echo setup-fragment
+`)
+
+	var executed []string
+	var stdout bytes.Buffer
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &stdout,
+		interactive: false,
+		assumeYes:   true,
+		noLink:      true,
+		executeSetup: func(shell shells.Shell, path string) error {
+			executed = append(executed, shell.Name()+"|"+path)
+			content := mustReadFile(t, path)
+			if !strings.Contains(content, "echo setup-fragment") {
+				t.Fatalf("setup file missing setup fragment: %q", content)
+			}
+			if !strings.Contains(content, "GRAPES_OUTPUT_PATH") {
+				t.Fatalf("setup file missing injected globals: %q", content)
+			}
+			return nil
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	setupPath := filepath.Join(outputDir, "bash-setup")
+	assertFileExists(t, setupPath)
+	assertFileMissing(t, filepath.Join(home, ".bashenv"))
+	assertFileMissing(t, filepath.Join(home, ".bashrc"))
+	if got, want := len(executed), 1; got != want {
+		t.Fatalf("len(executed) = %d, want %d", got, want)
+	}
+	if got, want := executed[0], "bash|"+setupPath; got != want {
+		t.Fatalf("executed[0] = %q, want %q", got, want)
+	}
+	if !strings.Contains(stdout.String(), "Executed setup file "+setupPath) {
+		t.Fatalf("stdout missing setup execution message: %q", stdout.String())
+	}
 }
 
 func TestRunNoLinkReportsGeneratedFilesWithFullPaths(t *testing.T) {
@@ -515,6 +587,8 @@ echo prompt
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileExists(t, filepath.Join(outputDir, "cache"))
+	assertFileExists(t, expectedRunStateDir(home))
 	data, err := os.ReadFile(filepath.Join(outputDir, "pwsh-env.ps1"))
 	if err != nil {
 		t.Fatal(err)
@@ -523,7 +597,6 @@ echo prompt
 	assertLineContainsFragments(t, content, "$env:GRAPES_SHELL = ", "pwsh")
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("pwsh", outputDir))
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUT_CACHE_DIR = ", "cache")
-	assertLineContainsFragments(t, content, "New-Item -ItemType Directory", "GRAPES_OUT_CACHE_DIR")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
@@ -579,6 +652,8 @@ echo prompt
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileExists(t, filepath.Join(outputDir, "cache"))
+	assertFileExists(t, expectedRunStateDir(home))
 	envContent := mustReadFile(t, filepath.Join(outputDir, "zshenv"))
 	if got, want := strings.Count(envContent, `GRAPES_SHELL="zsh"`), 1; got != want {
 		t.Fatalf("env GRAPES_SHELL count = %d, want %d; content=%q", got, want, envContent)
@@ -588,9 +663,6 @@ echo prompt
 	}
 	if got, want := strings.Count(envContent, `GRAPES_OUT_CACHE_DIR="`+expectedInjectedOutputPath("zsh", outputDir)+`/cache"`), 1; got != want {
 		t.Fatalf("env GRAPES_OUT_CACHE_DIR count = %d, want %d; content=%q", got, want, envContent)
-	}
-	if !strings.Contains(envContent, `[ -d "$GRAPES_OUT_CACHE_DIR" ] || mkdir -p "$GRAPES_OUT_CACHE_DIR"`) {
-		t.Fatalf("zshenv missing cache dir creation: %q", envContent)
 	}
 	mainContent := mustReadFile(t, filepath.Join(outputDir, "zshrc"))
 	if strings.Contains(mainContent, "GRAPES_SHELL") {
@@ -645,6 +717,8 @@ imports:
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileExists(t, filepath.Join(outputDir, "cache"))
+	assertFileExists(t, expectedRunStateDir(home))
 	envContent := mustReadFile(t, filepath.Join(outputDir, "nushell-env.nu"))
 	mainContent := mustReadFile(t, filepath.Join(outputDir, "nushell-config.nu"))
 	combined := envContent + "\n" + mainContent
@@ -655,7 +729,6 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_OUT_CACHE_DIR = ", "path join", "cache")
-	assertLineContainsFragments(t, envContent, "mkdir $env.GRAPES_OUT_CACHE_DIR", "path exists")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GRAPES_EXEC_DIR")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_PATH = ", "fnm")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_VERSION = ", "1.39.0")
@@ -700,21 +773,44 @@ imports:
 `)
 	copyExampleFragments(t, sourceDir, "go", "bun", "fnm", "uv", "zoxide", "fzf")
 
+	var executed []string
+	var stdout bytes.Buffer
 	target := mustParseShell(t, "pwsh")
 	if err := runWithOptions(runOptions{
-		masterPath: masterPath,
-		targets:    []shells.Shell{target},
-		lookupEnv:  os.LookupEnv,
-		goos:       runtime.GOOS,
-		stdin:      strings.NewReader(""),
-		stdout:     &bytes.Buffer{},
-		assumeYes:  true,
-		noLink:     true,
+		masterPath:  masterPath,
+		targets:     []shells.Shell{target},
+		lookupEnv:   os.LookupEnv,
+		goos:        runtime.GOOS,
+		stdin:       strings.NewReader(""),
+		stdout:      &stdout,
+		assumeYes:   true,
+		noLink:      true,
+		executeSetup: func(shell shells.Shell, path string) error {
+			executed = append(executed, shell.Name()+"|"+path)
+			content := mustReadFile(t, path)
+			assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ")
+			assertLineContainsFragments(t, content, "$env:GRAPES_EXEC_PATH = ", "zoxide")
+			assertLineContainsFragments(t, content, "init powershell", "Set-Content", "zoxide.ps1")
+			return nil
+		},
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
+	assertFileExists(t, filepath.Join(outputDir, "cache"))
+	assertFileExists(t, expectedRunStateDir(home))
+	setupPath := filepath.Join(outputDir, "pwsh-setup.ps1")
+	assertFileExists(t, setupPath)
+	if got, want := len(executed), 1; got != want {
+		t.Fatalf("len(executed) = %d, want %d", got, want)
+	}
+	if got, want := executed[0], "pwsh|"+setupPath; got != want {
+		t.Fatalf("executed[0] = %q, want %q", got, want)
+	}
+	if !strings.Contains(stdout.String(), "Executed setup file "+setupPath) {
+		t.Fatalf("stdout missing setup execution message: %q", stdout.String())
+	}
 	envContent := mustReadFile(t, filepath.Join(outputDir, "pwsh-env.ps1"))
 	mainContent := mustReadFile(t, filepath.Join(outputDir, "pwsh-profile.ps1"))
 	combined := envContent + "\n" + mainContent
@@ -725,7 +821,6 @@ imports:
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_OUT_CACHE_DIR = ", "Join-Path", "cache")
-	assertLineContainsFragments(t, envContent, "New-Item -ItemType Directory", "GRAPES_OUT_CACHE_DIR")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "GRAPES_EXEC_DIR")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_PATH = ", "fnm")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_VERSION = ", "1.39.0")
@@ -735,7 +830,8 @@ imports:
 	assertLineContainsFragments(t, mainContent, "$env:GRAPES_EXEC_PATH = ", "zoxide")
 	assertFileExcludes(t, mainContent, "FNM_PATH")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
-	assertLineContainsFragments(t, mainContent, "init powershell", "Invoke-Expression")
+	assertLineContainsFragments(t, mainContent, ". ~/.local/state/grapes/zoxide.ps1")
+	assertFileExcludes(t, mainContent, "zoxide init powershell")
 }
 
 func TestRunDependencyChecksExecutableDependencyRendersWhenBinaryExists(t *testing.T) {
@@ -1545,6 +1641,10 @@ func expectedRunOutputDir(t *testing.T, home, appData string) string {
 		return filepath.Join(appData, "grapes")
 	}
 	return filepath.Join(home, ".config", "grapes")
+}
+
+func expectedRunStateDir(home string) string {
+	return filepath.Join(home, ".local", "state", "grapes")
 }
 
 func expectedInjectedOutputPath(shellName string, outputDir string) string {

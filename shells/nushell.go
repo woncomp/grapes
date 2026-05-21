@@ -19,6 +19,8 @@ func (nushellShell) ManagedFilename(phase string) string {
 	switch phase {
 	case PhaseEnv:
 		return "nushell-env.nu"
+	case PhaseSetup:
+		return "nushell-setup.nu"
 	default:
 		return "nushell-config.nu"
 	}

@@ -24,6 +24,8 @@ func (bashShell) ManagedFilename(phase string) string {
 	switch phase {
 	case PhaseEnv:
 		return "bashenv"
+	case PhaseSetup:
+		return "bash-setup"
 	default:
 		return "bashrc"
 	}
