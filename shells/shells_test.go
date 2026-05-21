@@ -9,7 +9,7 @@ import (
 
 func TestSupportedNames(t *testing.T) {
 	names := SupportedNames()
-	if got, want := strings.Join(names, ","), "bash,nushell,pwsh,zsh"; got != want {
+	if got, want := strings.Join(names, ","), "pwsh,nushell,zsh,bash"; got != want {
 		t.Fatalf("SupportedNames() = %q, want %q", got, want)
 	}
 }

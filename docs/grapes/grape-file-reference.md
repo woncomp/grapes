@@ -97,9 +97,9 @@ paths:
 
 Rendering behavior:
 
-- `bash` / `zsh`: `export KEY=...`, `export PATH=...:$PATH`
-- `nushell`: `$env.KEY = ...`, `$env.PATH = ($env.PATH | prepend ...)`
 - `pwsh`: `$env:KEY = ...`, `$env:PATH = ... + [System.IO.Path]::PathSeparator + $env:PATH`
+- `nushell`: `$env.KEY = ...`, `$env.PATH = ($env.PATH | prepend ...)`
+- `zsh` / `bash`: `export KEY=...`, `export PATH=...:$PATH`
 
 ## Shell conditionals
 
@@ -113,17 +113,17 @@ Fragment bodies may use preprocessor directives:
 
 Supported canonical shell names:
 
-- `bash`
-- `zsh`
-- `nushell`
 - `pwsh`
+- `nushell`
+- `zsh`
+- `bash`
 
 Common examples:
 
-- `#ifdef BASH`
-- `#ifdef ZSH`
-- `#ifdef NUSHELL`
 - `#ifdef PWSH`
+- `#ifdef NUSHELL`
+- `#ifdef ZSH`
+- `#ifdef BASH`
 
 ## Dependency-gated fragments
 

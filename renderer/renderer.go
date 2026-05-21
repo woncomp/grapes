@@ -9,7 +9,7 @@ import (
 
 func RenderBlock(goos, shell string, env map[string]string, paths []string, body string) (string, error) {
 	switch shell {
-	case "bash", "zsh", "nushell", "pwsh":
+	case "pwsh", "nushell", "zsh", "bash":
 	default:
 		return "", fmt.Errorf("unsupported shell %q", shell)
 	}
@@ -18,28 +18,28 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 
 	for _, key := range slices.Sorted(maps.Keys(env)) {
 		switch shell {
-		case "bash", "zsh":
-			lines = append(lines, fmt.Sprintf("export %s=%s", key, QuoteValue(shell, env[key])))
-		case "nushell":
-			lines = append(lines, fmt.Sprintf("$env.%s = %s", key, QuoteValue(shell, env[key])))
 		case "pwsh":
 			lines = append(lines, fmt.Sprintf("$env:%s = %s", key, QuoteValue(shell, env[key])))
+		case "nushell":
+			lines = append(lines, fmt.Sprintf("$env.%s = %s", key, QuoteValue(shell, env[key])))
+		case "zsh", "bash":
+			lines = append(lines, fmt.Sprintf("export %s=%s", key, QuoteValue(shell, env[key])))
 		}
 	}
 
 	for i := len(paths) - 1; i >= 0; i-- {
 		path := paths[i]
 		switch shell {
-		case "bash", "zsh":
-			lines = append(lines, fmt.Sprintf("export PATH=%s:$PATH", QuoteValue(shell, path)))
-		case "nushell":
-			lines = append(lines, fmt.Sprintf("$env.PATH = ($env.PATH | prepend %s)", QuoteValue(shell, path)))
 		case "pwsh":
 			lines = append(lines, fmt.Sprintf(
 				"$env:PATH = %s + %s + $env:PATH",
 				QuoteValue(shell, path),
 				QuoteValue(shell, pwshPathSeparator(goos)),
 			))
+		case "nushell":
+			lines = append(lines, fmt.Sprintf("$env.PATH = ($env.PATH | prepend %s)", QuoteValue(shell, path)))
+		case "zsh", "bash":
+			lines = append(lines, fmt.Sprintf("export PATH=%s:$PATH", QuoteValue(shell, path)))
 		}
 	}
 
@@ -54,15 +54,15 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 
 func RenderGrapeExecScope(shell, execPath, execDir, execVersion string) (string, error) {
 	switch shell {
-	case "bash", "zsh":
+	case "pwsh":
 		lines := []string{
-			fmt.Sprintf("export GRAPES_EXEC_PATH=%s", QuoteValue(shell, strings.ReplaceAll(execPath, `\`, "/"))),
-			fmt.Sprintf("export GRAPES_EXEC_DIR=%s", QuoteValue(shell, strings.ReplaceAll(execDir, `\`, "/"))),
+			fmt.Sprintf("$env:GRAPES_EXEC_PATH = %s", QuoteValue(shell, execPath)),
+			fmt.Sprintf("$env:GRAPES_EXEC_DIR = %s", QuoteValue(shell, execDir)),
 		}
 		if strings.TrimSpace(execVersion) == "" {
-			lines = append(lines, "unset GRAPES_EXEC_VERSION")
+			lines = append(lines, "Remove-Item Env:GRAPES_EXEC_VERSION -ErrorAction SilentlyContinue")
 		} else {
-			lines = append(lines, fmt.Sprintf("export GRAPES_EXEC_VERSION=%s", QuoteValue(shell, execVersion)))
+			lines = append(lines, fmt.Sprintf("$env:GRAPES_EXEC_VERSION = %s", QuoteValue(shell, execVersion)))
 		}
 		return strings.Join(lines, "\n") + "\n", nil
 	case "nushell":
@@ -76,15 +76,15 @@ func RenderGrapeExecScope(shell, execPath, execDir, execVersion string) (string,
 			lines = append(lines, fmt.Sprintf("$env.GRAPES_EXEC_VERSION = %s", QuoteValue(shell, execVersion)))
 		}
 		return strings.Join(lines, "\n") + "\n", nil
-	case "pwsh":
+	case "zsh", "bash":
 		lines := []string{
-			fmt.Sprintf("$env:GRAPES_EXEC_PATH = %s", QuoteValue(shell, execPath)),
-			fmt.Sprintf("$env:GRAPES_EXEC_DIR = %s", QuoteValue(shell, execDir)),
+			fmt.Sprintf("export GRAPES_EXEC_PATH=%s", QuoteValue(shell, strings.ReplaceAll(execPath, `\`, "/"))),
+			fmt.Sprintf("export GRAPES_EXEC_DIR=%s", QuoteValue(shell, strings.ReplaceAll(execDir, `\`, "/"))),
 		}
 		if strings.TrimSpace(execVersion) == "" {
-			lines = append(lines, "Remove-Item Env:GRAPES_EXEC_VERSION -ErrorAction SilentlyContinue")
+			lines = append(lines, "unset GRAPES_EXEC_VERSION")
 		} else {
-			lines = append(lines, fmt.Sprintf("$env:GRAPES_EXEC_VERSION = %s", QuoteValue(shell, execVersion)))
+			lines = append(lines, fmt.Sprintf("export GRAPES_EXEC_VERSION=%s", QuoteValue(shell, execVersion)))
 		}
 		return strings.Join(lines, "\n") + "\n", nil
 	default:
@@ -94,12 +94,12 @@ func RenderGrapeExecScope(shell, execPath, execDir, execVersion string) (string,
 
 func RenderGrapeExecCleanup(shell string) (string, error) {
 	switch shell {
-	case "bash", "zsh":
-		return "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION\n", nil
-	case "nushell":
-		return "hide-env GRAPES_EXEC_PATH\nhide-env GRAPES_EXEC_DIR\nhide-env GRAPES_EXEC_VERSION\n", nil
 	case "pwsh":
 		return "Remove-Item Env:GRAPES_EXEC_PATH -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_DIR -ErrorAction SilentlyContinue\nRemove-Item Env:GRAPES_EXEC_VERSION -ErrorAction SilentlyContinue\n", nil
+	case "nushell":
+		return "hide-env GRAPES_EXEC_PATH\nhide-env GRAPES_EXEC_DIR\nhide-env GRAPES_EXEC_VERSION\n", nil
+	case "zsh", "bash":
+		return "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION\n", nil
 	default:
 		return "", fmt.Errorf("unsupported shell %q", shell)
 	}
@@ -114,10 +114,10 @@ func pwshPathSeparator(goos string) string {
 
 func QuoteValue(shell, value string) string {
 	switch shell {
-	case "bash", "zsh":
-		return quotePosixDoubleQuotedValue(value)
-	case "nushell", "pwsh":
+	case "pwsh", "nushell":
 		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	case "zsh", "bash":
+		return quotePosixDoubleQuotedValue(value)
 	default:
 		panic(fmt.Sprintf("unsupported shell %q", shell))
 	}

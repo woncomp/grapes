@@ -48,7 +48,7 @@ func TestExampleFragmentsValid(t *testing.T) {
 					t.Errorf("block %d: has no content", i)
 				}
 
-				for _, shell := range []string{"bash", "zsh", "nushell", "pwsh"} {
+				for _, shell := range []string{"pwsh", "nushell", "zsh", "bash"} {
 					if _, err := preprocessor.Process(block.Body, shell); err != nil {
 						t.Errorf("block %d: preprocessing for %s failed: %v", i, shell, err)
 					}

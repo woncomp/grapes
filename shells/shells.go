@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -45,12 +44,7 @@ func Supported() []Shell {
 }
 
 func SupportedNames() []string {
-	names := make([]string, 0, len(supportedShells))
-	for _, shell := range supportedShells {
-		names = append(names, shell.Name())
-	}
-	slices.Sort(names)
-	return names
+	return []string{"pwsh", "nushell", "zsh", "bash"}
 }
 
 func Parse(raw string) (Shell, error) {
