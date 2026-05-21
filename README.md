@@ -6,6 +6,8 @@
 
 `grapes` is a project for managing terminal environments in a more structured way. It is designed to make shell configuration easier to organize, easier to migrate between machines, and easier to keep consistent across multiple shells.
 
+Current release target: `0.1.0`
+
 ## What does it offer
 
 - A structured approach to terminal environment management
