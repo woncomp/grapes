@@ -71,6 +71,41 @@ func TestOutputPathInjection(t *testing.T) {
 	}
 }
 
+func TestHomeInjection(t *testing.T) {
+	tests := []struct {
+		shell    string
+		homePath string
+		want     string
+	}{
+		{
+			shell:    "bash",
+			homePath: `C:\Users\me\src\dotfiles`,
+			want:     `export GRAPES_HOME="C:/Users/me/src/dotfiles"`,
+		},
+		{
+			shell:    "zsh",
+			homePath: `C:\Users\me\src\dotfiles`,
+			want:     `export GRAPES_HOME="C:/Users/me/src/dotfiles"`,
+		},
+		{
+			shell:    "nushell",
+			homePath: `C:\Users\me\src\dotfiles`,
+			want:     `$env.GRAPES_HOME = 'C:\Users\me\src\dotfiles'`,
+		},
+		{
+			shell:    "pwsh",
+			homePath: `C:\Users\me\src\dotfiles`,
+			want:     `$env:GRAPES_HOME = 'C:\Users\me\src\dotfiles'`,
+		},
+	}
+
+	for _, tt := range tests {
+		if got := HomeInjectionLine(tt.shell, tt.homePath); got != tt.want {
+			t.Errorf("HomeInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.homePath, got, tt.want)
+		}
+	}
+}
+
 func TestOutputCacheDirInjection(t *testing.T) {
 	tests := []struct {
 		shell      string

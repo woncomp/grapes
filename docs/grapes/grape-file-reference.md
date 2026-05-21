@@ -176,6 +176,7 @@ Behavior:
 Generated `env` outputs inject:
 
 - `GRAPES_SHELL`: the canonical target shell name
+- `GRAPES_HOME`: the directory that contains the master `.grapes` file
 - `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
 - `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`
 

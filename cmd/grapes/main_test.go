@@ -535,6 +535,7 @@ echo prompt
 	}
 	content := string(data)
 	assertLineContainsFragments(t, content, "$env.GRAPES_SHELL = ", "nushell")
+	assertLineContainsFragments(t, content, "$env.GRAPES_HOME = ", sourceDir)
 	assertLineContainsFragments(t, content, "$env.GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("nushell", outputDir))
 	assertLineContainsFragments(t, content, "$env.PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env.PATH = ", "prepend", "/tool/bin")
@@ -595,6 +596,7 @@ echo prompt
 	}
 	content := string(data)
 	assertLineContainsFragments(t, content, "$env:GRAPES_SHELL = ", "pwsh")
+	assertLineContainsFragments(t, content, "$env:GRAPES_HOME = ", sourceDir)
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("pwsh", outputDir))
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUT_CACHE_DIR = ", "cache")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
@@ -657,6 +659,9 @@ echo prompt
 	envContent := mustReadFile(t, filepath.Join(outputDir, "zshenv"))
 	if got, want := strings.Count(envContent, `GRAPES_SHELL="zsh"`), 1; got != want {
 		t.Fatalf("env GRAPES_SHELL count = %d, want %d; content=%q", got, want, envContent)
+	}
+	if got, want := strings.Count(envContent, `GRAPES_HOME="`+expectedInjectedPath("zsh", sourceDir)+`"`), 1; got != want {
+		t.Fatalf("env GRAPES_HOME count = %d, want %d; content=%q", got, want, envContent)
 	}
 	if got, want := strings.Count(envContent, `GRAPES_OUTPUT_PATH="`+expectedInjectedOutputPath("zsh", outputDir)+`"`), 1; got != want {
 		t.Fatalf("env GRAPES_OUTPUT_PATH count = %d, want %d; content=%q", got, want, envContent)
@@ -777,14 +782,14 @@ imports:
 	var stdout bytes.Buffer
 	target := mustParseShell(t, "pwsh")
 	if err := runWithOptions(runOptions{
-		masterPath:  masterPath,
-		targets:     []shells.Shell{target},
-		lookupEnv:   os.LookupEnv,
-		goos:        runtime.GOOS,
-		stdin:       strings.NewReader(""),
-		stdout:      &stdout,
-		assumeYes:   true,
-		noLink:      true,
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &stdout,
+		assumeYes:  true,
+		noLink:     true,
 		executeSetup: func(shell shells.Shell, path string) error {
 			executed = append(executed, shell.Name()+"|"+path)
 			content := mustReadFile(t, path)
@@ -1646,11 +1651,15 @@ func expectedRunStateDir(home string) string {
 }
 
 func expectedInjectedOutputPath(shellName string, outputDir string) string {
+	return expectedInjectedPath(shellName, outputDir)
+}
+
+func expectedInjectedPath(shellName string, path string) string {
 	switch shellName {
 	case "bash", "zsh":
-		return strings.ReplaceAll(outputDir, `\`, "/")
+		return strings.ReplaceAll(path, `\`, "/")
 	default:
-		return outputDir
+		return path
 	}
 }
 

@@ -63,15 +63,28 @@ func ShellInjectionLine(shell string) string {
 }
 
 func OutputPathInjectionLine(shell string, outputPath string) string {
-	formattedPath := outputPath
 	switch strings.ToLower(shell) {
 	case "bash", "zsh":
-		formattedPath = strings.ReplaceAll(outputPath, `\`, "/")
+		formattedPath := strings.ReplaceAll(outputPath, `\`, "/")
 		return fmt.Sprintf("export GRAPES_OUTPUT_PATH=%s", renderer.QuoteValue(shell, formattedPath))
 	case "nushell":
-		return fmt.Sprintf("$env.GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, formattedPath))
+		return fmt.Sprintf("$env.GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, outputPath))
 	case "pwsh":
-		return fmt.Sprintf("$env:GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, formattedPath))
+		return fmt.Sprintf("$env:GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, outputPath))
+	default:
+		panic(fmt.Sprintf("unsupported shell %q", shell))
+	}
+}
+
+func HomeInjectionLine(shell string, homePath string) string {
+	switch strings.ToLower(shell) {
+	case "bash", "zsh":
+		formattedPath := strings.ReplaceAll(homePath, `\`, "/")
+		return fmt.Sprintf("export GRAPES_HOME=%s", renderer.QuoteValue(shell, formattedPath))
+	case "nushell":
+		return fmt.Sprintf("$env.GRAPES_HOME = %s", renderer.QuoteValue(shell, homePath))
+	case "pwsh":
+		return fmt.Sprintf("$env:GRAPES_HOME = %s", renderer.QuoteValue(shell, homePath))
 	default:
 		panic(fmt.Sprintf("unsupported shell %q", shell))
 	}
@@ -91,9 +104,10 @@ func OutputCacheDirInjectionLine(shell string, outputPath string) string {
 	}
 }
 
-func InjectedEnvLines(shell string, outputPath string) []string {
+func InjectedEnvLines(shell string, outputPath string, homePath string) []string {
 	return []string{
 		ShellInjectionLine(shell),
+		HomeInjectionLine(shell, homePath),
 		OutputPathInjectionLine(shell, outputPath),
 		OutputCacheDirInjectionLine(shell, outputPath),
 	}

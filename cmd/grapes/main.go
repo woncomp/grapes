@@ -301,6 +301,10 @@ func runWithOptions(opts runOptions) error {
 	}
 
 	fragDir := filepath.Dir(opts.masterPath)
+	grapesHome, err := filepath.Abs(fragDir)
+	if err != nil {
+		return fmt.Errorf("resolving master directory %s: %w", fragDir, err)
+	}
 	grapes, err := parseAllGrapes(fragDir, grapesFile.Imports)
 	if err != nil {
 		return err
@@ -350,7 +354,7 @@ func runWithOptions(opts runOptions) error {
 			var shellFragments []writer.Fragment
 			hasGrapeFragments := false
 			if phase == shells.PhaseEnv {
-				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir)
+				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir, grapesHome)
 				shellFragments = append(shellFragments, writer.Fragment{
 					Name:    "__GRAPE_ENV",
 					Content: strings.Join(injectedLines, "\n") + "\n",
@@ -389,7 +393,7 @@ func runWithOptions(opts runOptions) error {
 				if !hasGrapeFragments {
 					continue
 				}
-				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir)
+				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir, grapesHome)
 				shellFragments = append([]writer.Fragment{{
 					Name:    "__GRAPE_ENV",
 					Content: strings.Join(injectedLines, "\n") + "\n",
