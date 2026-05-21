@@ -10,35 +10,35 @@ depend_executable:
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
 
-#ifdef PWSH
+--#ifdef PWSH
 
 . ~/.local/state/grapes/zoxide.ps1
 
-#elif NUSHELL
+--#elif NUSHELL
 
 source ~/.local/state/grapes/zoxide.nu
 
-#else
+--#else
 
 . ~/.local/state/grapes/zoxide_$GRAPES_SHELL
 
-#endif
+--#endif
 
 ---
 phase: setup
 ---
 
 
-#ifdef PWSH
+--#ifdef PWSH
 
 zoxide init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1
 
-#elif NUSHELL
+--#elif NUSHELL
 
 zoxide init nushell | save -f ~/.local/state/grapes/zoxide.nu
 
-#else
+--#else
 
 zoxide init $GRAPES_SHELL > ~/.local/state/grapes/zoxide_$GRAPES_SHELL
 
-#endif
+--#endif

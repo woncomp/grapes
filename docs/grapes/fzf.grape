@@ -6,10 +6,10 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef ZSH
+--#ifdef ZSH
 source <(fzf --zsh)
-#endif
+--#endif
 
-#ifdef BASH
+--#ifdef BASH
 eval "$(fzf --bash)"
-#endif
+--#endif

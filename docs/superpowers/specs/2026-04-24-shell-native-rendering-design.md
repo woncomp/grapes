@@ -159,7 +159,7 @@ $env:PATH = "entry;$env:PATH"
 - Fragments that do not use `env` or `paths` should be unaffected.
 - Existing `bash` and `zsh` output should remain unchanged.
 - Existing preprocessor behavior should remain unchanged.
-- The new rendering step should work with current `#ifdef` / `#elif` processing because rendering happens before preprocessing for the active shell.
+- The new rendering step should work with current `--#ifdef` / `--#elif` processing because rendering happens before preprocessing for the active shell.
 
 ## Error Handling
 

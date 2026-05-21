@@ -142,7 +142,7 @@ func TestOutputCacheDirInjection(t *testing.T) {
 }
 
 func TestIfdefMatch(t *testing.T) {
-	input := "#ifdef BASH\necho bash\n#endif\necho common\n"
+	input := "--#ifdef BASH\necho bash\n--#endif\necho common\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestIfdefMatch(t *testing.T) {
 }
 
 func TestIfdefNoMatch(t *testing.T) {
-	input := "#ifdef BASH\necho bash\n#endif\necho common\n"
+	input := "--#ifdef BASH\necho bash\n--#endif\necho common\n"
 	result, err := Process(input, "zsh")
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func TestIfdefNoMatch(t *testing.T) {
 }
 
 func TestIfndef(t *testing.T) {
-	input := "#ifndef BASH\necho not-bash\n#endif\n"
+	input := "--#ifndef BASH\necho not-bash\n--#endif\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +187,7 @@ func TestIfndef(t *testing.T) {
 }
 
 func TestElse(t *testing.T) {
-	input := "#ifdef BASH\necho bash\n#else\necho other\n#endif\n"
+	input := "--#ifdef BASH\necho bash\n--#else\necho other\n--#endif\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
@@ -208,7 +208,7 @@ func TestElse(t *testing.T) {
 }
 
 func TestElif(t *testing.T) {
-	input := "#ifdef BASH\necho bash\n#elif ZSH\necho zsh\n#else\necho other\n#endif\n"
+	input := "--#ifdef BASH\necho bash\n--#elif ZSH\necho zsh\n--#else\necho other\n--#endif\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +227,7 @@ func TestElif(t *testing.T) {
 }
 
 func TestIfdefPwshAndNushell(t *testing.T) {
-	input := "#ifdef NUSHELL\necho nu\n#elif PWSH\necho pwsh\n#else\necho other\n#endif\n"
+	input := "--#ifdef NUSHELL\necho nu\n--#elif PWSH\necho pwsh\n--#else\necho other\n--#endif\n"
 
 	result, err := Process(input, "pwsh")
 	if err != nil {
@@ -241,7 +241,7 @@ func TestIfdefPwshAndNushell(t *testing.T) {
 }
 
 func TestIfdefNushellAndPwsh(t *testing.T) {
-	input := "#ifdef NUSHELL\necho nu\n#elif PWSH\necho pwsh\n#else\necho other\n#endif\n"
+	input := "--#ifdef NUSHELL\necho nu\n--#elif PWSH\necho pwsh\n--#else\necho other\n--#endif\n"
 
 	result, err := Process(input, "nushell")
 	if err != nil {
@@ -255,7 +255,7 @@ func TestIfdefNushellAndPwsh(t *testing.T) {
 }
 
 func TestNestedDirectives(t *testing.T) {
-	input := "#ifdef BASH\n#ifdef ZSH\necho both\n#else\necho bash-only\n#endif\n#endif\n"
+	input := "--#ifdef BASH\n--#ifdef ZSH\necho both\n--#else\necho bash-only\n--#endif\n--#endif\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
@@ -267,7 +267,7 @@ func TestNestedDirectives(t *testing.T) {
 }
 
 func TestUnterminatedDirective(t *testing.T) {
-	input := "#ifdef BASH\necho bash\n"
+	input := "--#ifdef BASH\necho bash\n"
 	_, err := Process(input, "bash")
 	if err == nil {
 		t.Error("expected error for unterminated directive")
@@ -278,7 +278,7 @@ func TestUnterminatedDirective(t *testing.T) {
 }
 
 func TestUnknownDirective(t *testing.T) {
-	input := "#ifdef BASH\necho bash\n#endif\n#undef FOO\n"
+	input := "--#ifdef BASH\necho bash\n--#endif\n--#undef FOO\n"
 	_, err := Process(input, "bash")
 	if err == nil {
 		t.Error("expected error for unknown directive")
@@ -286,7 +286,7 @@ func TestUnknownDirective(t *testing.T) {
 }
 
 func TestMultipleDirectives(t *testing.T) {
-	input := "export PATH=/bin\n#ifdef BASH\nexport BASH_VAR=1\n#endif\n#ifdef ZSH\nexport ZSH_VAR=1\n#endif\necho done\n"
+	input := "export PATH=/bin\n--#ifdef BASH\nexport BASH_VAR=1\n--#endif\n--#ifdef ZSH\nexport ZSH_VAR=1\n--#endif\necho done\n"
 	result, err := Process(input, "bash")
 	if err != nil {
 		t.Fatal(err)
@@ -298,41 +298,52 @@ func TestMultipleDirectives(t *testing.T) {
 }
 
 func TestIfdefWrongArgCount(t *testing.T) {
-	input := "#ifdef A B\necho hi\n#endif\n"
+	input := "--#ifdef A B\necho hi\n--#endif\n"
 	_, err := Process(input, "bash")
 	if err == nil {
-		t.Error("expected error for #ifdef with wrong arg count")
+		t.Error("expected error for --#ifdef with wrong arg count")
 	}
 }
 
 func TestIfndefWrongArgCount(t *testing.T) {
-	input := "#ifndef A B\necho hi\n#endif\n"
+	input := "--#ifndef A B\necho hi\n--#endif\n"
 	_, err := Process(input, "bash")
 	if err == nil {
-		t.Error("expected error for #ifndef with wrong arg count")
+		t.Error("expected error for --#ifndef with wrong arg count")
 	}
 }
 
 func TestOrphanElif(t *testing.T) {
-	input := "#elif BASH\necho hi\n"
+	input := "--#elif BASH\necho hi\n"
 	_, err := Process(input, "bash")
 	if err == nil {
-		t.Error("expected error for orphan #elif")
+		t.Error("expected error for orphan --#elif")
 	}
 }
 
 func TestOrphanElse(t *testing.T) {
-	input := "#else\necho hi\n"
+	input := "--#else\necho hi\n"
 	_, err := Process(input, "bash")
 	if err == nil {
-		t.Error("expected error for orphan #else")
+		t.Error("expected error for orphan --#else")
 	}
 }
 
 func TestOrphanEndif(t *testing.T) {
-	input := "#endif\n"
+	input := "--#endif\n"
 	_, err := Process(input, "bash")
 	if err == nil {
-		t.Error("expected error for orphan #endif")
+		t.Error("expected error for orphan --#endif")
+	}
+}
+
+func TestShellCommentsArePreserved(t *testing.T) {
+	input := "#!/usr/bin/env bash\n# regular comment\necho hello\n"
+	result, err := Process(input, "bash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != input {
+		t.Errorf("got %q, want %q", result, input)
 	}
 }

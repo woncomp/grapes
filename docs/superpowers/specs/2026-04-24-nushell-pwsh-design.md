@@ -236,12 +236,12 @@ The preprocessor already compares directive operands to the active shell name ca
 
 New supported examples:
 
-- `#ifdef NUSHELL`
-- `#ifndef NUSHELL`
-- `#elif NUSHELL`
-- `#ifdef PWSH`
-- `#ifndef PWSH`
-- `#elif PWSH`
+- `--#ifdef NUSHELL`
+- `--#ifndef NUSHELL`
+- `--#elif NUSHELL`
+- `--#ifdef PWSH`
+- `--#ifndef PWSH`
+- `--#elif PWSH`
 
 `GRAPES_SHELL` should continue to expose the canonical shell name:
 
@@ -359,8 +359,8 @@ The feature should extend the existing package-level test suite rather than intr
 
 ### Preprocessor tests
 
-- `#ifdef NUSHELL` and `#ifdef PWSH` behave correctly
-- `#elif NUSHELL` and `#elif PWSH` behave correctly
+- `--#ifdef NUSHELL` and `--#ifdef PWSH` behave correctly
+- `--#elif NUSHELL` and `--#elif PWSH` behave correctly
 - `GRAPES_SHELL` is emitted as `nushell` and `pwsh`
 
 ### CLI tests

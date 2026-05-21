@@ -41,8 +41,8 @@ docs/grapes.toml
    - Reports missing fragments and circular dependency paths.
 
 4. **Preprocessor (`preprocessor`)**
-   - Evaluates `#ifdef`, `#ifndef`, `#elif`, `#else`, and `#endif` directives.
-   - Rejects unknown `#...` directives.
+   - Evaluates `--#ifdef`, `--#ifndef`, `--#elif`, `--#else`, and `--#endif` directives.
+   - Rejects unknown `--#...` directives.
    - Injects generated Grapes environment variables into managed env output.
 
 5. **Writer (`writer`)**
@@ -66,7 +66,7 @@ docs/grapes.toml
 
 Directive syntax and author-facing shell-condition guidance are documented in `docs/grapes/grape-file-reference.md`.
 
-Unknown `#...` lines are treated as invalid directives and produce an error with a line number.
+Unknown `--#...` lines are treated as invalid directives and produce an error with a line number.
 
 ## CLI Interface
 

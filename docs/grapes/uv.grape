@@ -6,23 +6,23 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef PWSH
+--#ifdef PWSH
 uv generate-shell-completion powershell | Out-String | Invoke-Expression
-#elif ZSH
+--#elif ZSH
 eval "$(uv generate-shell-completion zsh)"
-#elif BASH
+--#elif BASH
 eval "$(uv generate-shell-completion bash)"
-#endif
+--#endif
 
 ---
 phase: env
 ---
-#ifdef PWSH
+--#ifdef PWSH
 $env:PATH = $env:GRAPES_EXEC_DIR + [System.IO.Path]::PathSeparator + $env:PATH
-#elif NUSHELL
+--#elif NUSHELL
 $env.PATH = ($env.PATH | prepend $env.GRAPES_EXEC_DIR)
-#elif ZSH
+--#elif ZSH
 export PATH="$GRAPES_EXEC_DIR:$PATH"
-#elif BASH
+--#elif BASH
 export PATH="$GRAPES_EXEC_DIR:$PATH"
-#endif
+--#endif

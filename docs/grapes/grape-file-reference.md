@@ -111,11 +111,11 @@ Rendering behavior:
 
 Fragment bodies may use preprocessor directives:
 
-- `#ifdef <shell>`
-- `#ifndef <shell>`
-- `#elif <shell>`
-- `#else`
-- `#endif`
+- `--#ifdef <shell>`
+- `--#ifndef <shell>`
+- `--#elif <shell>`
+- `--#else`
+- `--#endif`
 
 Supported canonical shell names:
 
@@ -126,10 +126,10 @@ Supported canonical shell names:
 
 Common examples:
 
-- `#ifdef PWSH`
-- `#ifdef NUSHELL`
-- `#ifdef ZSH`
-- `#ifdef BASH`
+- `--#ifdef PWSH`
+- `--#ifdef NUSHELL`
+- `--#ifdef ZSH`
+- `--#ifdef BASH`
 
 ## Dependency-gated fragments
 
@@ -203,13 +203,13 @@ These scoped executable variables are set at the start of each rendered grape sc
 ```yaml
 ---
 phase: main
-#ifdef BASH
+--#ifdef BASH
 complete -C some-tool some-tool
-#endif
+--#endif
 
-#ifdef ZSH
+--#ifdef ZSH
 autoload -Uz compinit && compinit
-#endif
+--#endif
 
 ---
 phase: env

@@ -6,29 +6,29 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef PWSH
+--#ifdef PWSH
 fnm env --use-on-cd | Out-String | Invoke-Expression
-#elif NUSHELL
+--#elif NUSHELL
 
-#else
+--#else
 eval "$(fnm env --use-on-cd)"
-#endif
+--#endif
 
 ---
 phase: env
 ---
-#ifdef PWSH
+--#ifdef PWSH
 
 fnm env --shell powershell | Out-String | Invoke-Expression
 
-#elif NUSHELL
+--#elif NUSHELL
 
 load-env (fnm env --json | from json)
 $env.PATH = ($env.PATH | prepend $env.FNM_MULTISHELL_PATH)
 
-#else
+--#else
 
 export PATH="$GRAPES_EXEC_DIR:$PATH"
 eval "$(fnm env --shell $GRAPES_SHELL)"
 
-#endif
+--#endif

@@ -6,18 +6,18 @@ depend_executable:
     - version
   version_regex: "go([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
 ---
-#ifdef PWSH
+--#ifdef PWSH
 if (-not $env:GOPATH) {
   $env:GOPATH = Join-Path $HOME "go"
 }
 $env:PATH = (Join-Path $env:GOPATH "bin") + [System.IO.Path]::PathSeparator + $env:PATH
-#elif NUSHELL
+--#elif NUSHELL
 $env.GOPATH = ($env.GOPATH? | default ($env.HOME | path join "go"))
 $env.PATH = ($env.PATH | prepend ($env.GOPATH | path join "bin"))
-#elif ZSH
+--#elif ZSH
 export GOPATH="${GOPATH:-$HOME/go}"
 export PATH="$GOPATH/bin:$PATH"
-#elif BASH
+--#elif BASH
 export GOPATH="${GOPATH:-$HOME/go}"
 export PATH="$GOPATH/bin:$PATH"
-#endif
+--#endif

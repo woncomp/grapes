@@ -9,7 +9,7 @@ import (
 )
 
 // Process evaluates preprocessor directives in body for the given shell.
-// Supported directives: #ifdef, #ifndef, #elif, #else, #endif.
+// Supported directives: --#ifdef, --#ifndef, --#elif, --#else, --#endif.
 func Process(body string, shell string) (string, error) {
 	trimmedBody := strings.TrimRight(body, "\n")
 	var lines []string
@@ -30,8 +30,8 @@ func Process(body string, shell string) (string, error) {
 			continue
 		}
 
-		// Detect unknown preprocessor-like directives
-		if strings.HasPrefix(trimmed, "#") && trimmed != "" {
+		// Detect unknown preprocessor-like directives.
+		if strings.HasPrefix(trimmed, "--#") {
 			return "", fmt.Errorf("line %d: unknown directive %q", i+1, trimmed)
 		}
 
@@ -41,7 +41,7 @@ func Process(body string, shell string) (string, error) {
 	}
 
 	if len(stack) != 1 {
-		return "", fmt.Errorf("unterminated directive (unclosed #ifdef/#ifndef)")
+		return "", fmt.Errorf("unterminated directive (unclosed --#ifdef/--#ifndef)")
 	}
 
 	// Join and add trailing newline
@@ -128,11 +128,11 @@ func currentInclude(stack []blockState) bool {
 }
 
 func isDirective(line string) bool {
-	return strings.HasPrefix(line, "#ifdef ") ||
-		strings.HasPrefix(line, "#ifndef ") ||
-		strings.HasPrefix(line, "#elif ") ||
-		line == "#else" ||
-		line == "#endif"
+	return strings.HasPrefix(line, "--#ifdef ") ||
+		strings.HasPrefix(line, "--#ifndef ") ||
+		strings.HasPrefix(line, "--#elif ") ||
+		line == "--#else" ||
+		line == "--#endif"
 }
 
 func handleDirective(line string, shell string, stack *[]blockState, lineNum int) error {
@@ -140,9 +140,9 @@ func handleDirective(line string, shell string, stack *[]blockState, lineNum int
 	directive := parts[0]
 
 	switch directive {
-	case "#ifdef":
+	case "--#ifdef":
 		if len(parts) != 2 {
-			return fmt.Errorf("line %d: #ifdef requires exactly one argument", lineNum)
+			return fmt.Errorf("line %d: --#ifdef requires exactly one argument", lineNum)
 		}
 		match := strings.EqualFold(parts[1], shell)
 		parentInclude := currentInclude(*stack)
@@ -151,9 +151,9 @@ func handleDirective(line string, shell string, stack *[]blockState, lineNum int
 			satisfied: match,
 		})
 
-	case "#ifndef":
+	case "--#ifndef":
 		if len(parts) != 2 {
-			return fmt.Errorf("line %d: #ifndef requires exactly one argument", lineNum)
+			return fmt.Errorf("line %d: --#ifndef requires exactly one argument", lineNum)
 		}
 		match := !strings.EqualFold(parts[1], shell)
 		parentInclude := currentInclude(*stack)
@@ -162,12 +162,12 @@ func handleDirective(line string, shell string, stack *[]blockState, lineNum int
 			satisfied: match,
 		})
 
-	case "#elif":
+	case "--#elif":
 		if len(*stack) < 2 {
-			return fmt.Errorf("line %d: #elif without matching #ifdef/#ifndef", lineNum)
+			return fmt.Errorf("line %d: --#elif without matching --#ifdef/--#ifndef", lineNum)
 		}
 		if len(parts) != 2 {
-			return fmt.Errorf("line %d: #elif requires exactly one argument", lineNum)
+			return fmt.Errorf("line %d: --#elif requires exactly one argument", lineNum)
 		}
 		top := &(*stack)[len(*stack)-1]
 		if top.satisfied {
@@ -182,9 +182,9 @@ func handleDirective(line string, shell string, stack *[]blockState, lineNum int
 			top.satisfied = top.satisfied || match
 		}
 
-	case "#else":
+	case "--#else":
 		if len(*stack) < 2 {
-			return fmt.Errorf("line %d: #else without matching #ifdef/#ifndef", lineNum)
+			return fmt.Errorf("line %d: --#else without matching --#ifdef/--#ifndef", lineNum)
 		}
 		top := &(*stack)[len(*stack)-1]
 		if top.satisfied {
@@ -198,9 +198,9 @@ func handleDirective(line string, shell string, stack *[]blockState, lineNum int
 			top.satisfied = true
 		}
 
-	case "#endif":
+	case "--#endif":
 		if len(*stack) < 2 {
-			return fmt.Errorf("line %d: #endif without matching #ifdef/#ifndef", lineNum)
+			return fmt.Errorf("line %d: --#endif without matching --#ifdef/--#ifndef", lineNum)
 		}
 		*stack = (*stack)[:len(*stack)-1]
 
