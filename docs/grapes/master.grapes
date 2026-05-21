@@ -2,4 +2,5 @@
 imports:
   - zoxide
   - fnm
+  - starship
 ---

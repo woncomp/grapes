@@ -20,7 +20,7 @@ source ~/.local/state/grapes/zoxide.nu
 
 #else
 
-eval "$(zoxide init $GRAPES_SHELL)"
+. ~/.local/state/grapes/zoxide_$GRAPES_SHELL
 
 #endif
 
@@ -31,7 +31,7 @@ phase: setup
 
 #ifdef PWSH
 
-& $env:GRAPES_EXEC_PATH init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1
+zoxide init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1
 
 #elif NUSHELL
 
@@ -39,6 +39,6 @@ zoxide init nushell | save -f ~/.local/state/grapes/zoxide.nu
 
 #else
 
-eval "$(zoxide init $GRAPES_SHELL)"
+zoxide init $GRAPES_SHELL > ~/.local/state/grapes/zoxide_$GRAPES_SHELL
 
 #endif

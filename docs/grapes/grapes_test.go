@@ -10,7 +10,7 @@ import (
 	"github.com/woncomp/grapes/preprocessor"
 )
 
-var expectedFragments = []string{"go", "fnm", "uv", "bun", "zoxide", "fzf"}
+var expectedFragments = []string{"go", "fnm", "uv", "bun", "zoxide", "fzf", "starship"}
 
 func TestAllExampleFragmentsExist(t *testing.T) {
 	for _, name := range expectedFragments {
@@ -71,6 +71,7 @@ func TestExampleFragmentDependencyConfigs(t *testing.T) {
 		{name: "go", wantBinary: "go", wantArgs: []string{"version"}, wantRegex: `go([0-9]+\.[0-9]+(?:\.[0-9]+)?)`},
 		{name: "uv", wantBinary: "uv", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
 		{name: "zoxide", wantBinary: "zoxide", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
+		{name: "starship", wantBinary: "starship", wantArgs: []string{"--version"}, wantRegex: `([0-9]+\.[0-9]+\.[0-9]+)`},
 	}
 
 	for _, tc := range tests {
@@ -165,6 +166,36 @@ func TestZoxideExampleUsesCurrentShellSpecificInit(t *testing.T) {
 		"& $env:GRAPES_EXEC_PATH",
 		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1",
 		"init nushell | save -f ~/.local/state/grapes/zoxide.nu",
+	} {
+		if !strings.Contains(setupBody, want) {
+			t.Fatalf("setup block did not contain %q; got %q", want, setupBody)
+		}
+	}
+}
+
+func TestStarshipExampleUsesCachedShellSpecificInit(t *testing.T) {
+	frag, err := parser.ParseGrapeFile("starship.grape")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mainBody := fragmentBlockBody(t, frag, "main")
+	for _, want := range []string{
+		"~/.local/state/grapes/starship.ps1",
+		"~/.local/state/grapes/starship.$GRAPES_SHELL",
+		"source ~/.local/state/grapes/starship.nu",
+	} {
+		if !strings.Contains(mainBody, want) {
+			t.Fatalf("main block did not contain %q; got %q", want, mainBody)
+		}
+	}
+
+	setupBody := fragmentBlockBody(t, frag, "setup")
+	for _, want := range []string{
+		"init powershell",
+		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/starship.ps1",
+		"init nu | save -f ~/.local/state/grapes/starship.nu",
+		"starship init $GRAPES_SHELL > ~/.local/state/grapes/starship.$GRAPES_SHELL",
 	} {
 		if !strings.Contains(setupBody, want) {
 			t.Fatalf("setup block did not contain %q; got %q", want, setupBody)
