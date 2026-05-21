@@ -3,6 +3,8 @@ package preprocessor
 import (
 	"fmt"
 	"strings"
+
+	"github.com/woncomp/grapes/renderer"
 )
 
 // Process evaluates preprocessor directives in body for the given shell.
@@ -51,11 +53,33 @@ func Process(body string, shell string) (string, error) {
 func ShellInjectionLine(shell string) string {
 	switch strings.ToLower(shell) {
 	case "nushell":
-		return fmt.Sprintf(`$env.__GRAPES_SHELL = "%s"`, shell)
+		return fmt.Sprintf(`$env.GRAPES_SHELL = "%s"`, shell)
 	case "pwsh":
-		return fmt.Sprintf(`$env:__GRAPES_SHELL = "%s"`, shell)
+		return fmt.Sprintf(`$env:GRAPES_SHELL = "%s"`, shell)
 	default:
-		return fmt.Sprintf(`export __GRAPES_SHELL="%s"`, shell)
+		return fmt.Sprintf(`export GRAPES_SHELL="%s"`, shell)
+	}
+}
+
+func OutputPathInjectionLine(shell string, outputPath string) string {
+	formattedPath := outputPath
+	switch strings.ToLower(shell) {
+	case "bash", "zsh":
+		formattedPath = strings.ReplaceAll(outputPath, `\`, "/")
+		return fmt.Sprintf("export GRAPES_OUTPUT_PATH=%s", renderer.QuoteValue(shell, formattedPath))
+	case "nushell":
+		return fmt.Sprintf("$env.GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, formattedPath))
+	case "pwsh":
+		return fmt.Sprintf("$env:GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, formattedPath))
+	default:
+		panic(fmt.Sprintf("unsupported shell %q", shell))
+	}
+}
+
+func InjectedEnvLines(shell string, outputPath string) []string {
+	return []string{
+		ShellInjectionLine(shell),
+		OutputPathInjectionLine(shell, outputPath),
 	}
 }
 

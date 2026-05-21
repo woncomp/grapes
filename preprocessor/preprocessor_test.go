@@ -23,15 +23,50 @@ func TestNoDirectives(t *testing.T) {
 
 func TestShellInjection(t *testing.T) {
 	tests := map[string]string{
-		"bash":    `export __GRAPES_SHELL="bash"`,
-		"zsh":     `export __GRAPES_SHELL="zsh"`,
-		"nushell": `$env.__GRAPES_SHELL = "nushell"`,
-		"pwsh":    `$env:__GRAPES_SHELL = "pwsh"`,
+		"bash":    `export GRAPES_SHELL="bash"`,
+		"zsh":     `export GRAPES_SHELL="zsh"`,
+		"nushell": `$env.GRAPES_SHELL = "nushell"`,
+		"pwsh":    `$env:GRAPES_SHELL = "pwsh"`,
 	}
 
 	for shell, want := range tests {
 		if got := ShellInjectionLine(shell); got != want {
 			t.Errorf("ShellInjectionLine(%q) = %q, want %q", shell, got, want)
+		}
+	}
+}
+
+func TestOutputPathInjection(t *testing.T) {
+	tests := []struct {
+		shell      string
+		outputPath string
+		want       string
+	}{
+		{
+			shell:      "bash",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `export GRAPES_OUTPUT_PATH="C:/Users/me/AppData/Roaming/grapes"`,
+		},
+		{
+			shell:      "zsh",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `export GRAPES_OUTPUT_PATH="C:/Users/me/AppData/Roaming/grapes"`,
+		},
+		{
+			shell:      "nushell",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `$env.GRAPES_OUTPUT_PATH = 'C:\Users\me\AppData\Roaming\grapes'`,
+		},
+		{
+			shell:      "pwsh",
+			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
+			want:       `$env:GRAPES_OUTPUT_PATH = 'C:\Users\me\AppData\Roaming\grapes'`,
+		},
+	}
+
+	for _, tt := range tests {
+		if got := OutputPathInjectionLine(tt.shell, tt.outputPath); got != tt.want {
+			t.Errorf("OutputPathInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
 		}
 	}
 }

@@ -121,7 +121,7 @@ master.grapes
 4. **Preprocessor (`preprocessor`)**
    - Evaluates `#ifdef`, `#ifndef`, `#elif`, `#else`, and `#endif` directives.
    - Rejects unknown `#...` directives.
-   - Injects `export __GRAPES_SHELL="<shell>"` at the top of each processed block.
+   - Injects `GRAPES_SHELL` plus `GRAPES_OUTPUT_PATH` at the top of each generated env file.
 
 5. **Writer (`writer`)**
    - Writes selected output files into `~/.config/grapes/`.

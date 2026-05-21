@@ -243,7 +243,7 @@ New supported examples:
 - `#ifndef PWSH`
 - `#elif PWSH`
 
-`__GRAPES_SHELL` should continue to expose the canonical shell name:
+`GRAPES_SHELL` should continue to expose the canonical shell name:
 
 - `bash`
 - `zsh`
@@ -272,7 +272,7 @@ Canonical names returned by the shell layer remain:
 This ensures:
 
 - stable filenames
-- stable `__GRAPES_SHELL` values
+- stable `GRAPES_SHELL` values
 - deduplication across aliases
 
 ### Default target detection
@@ -361,7 +361,7 @@ The feature should extend the existing package-level test suite rather than intr
 
 - `#ifdef NUSHELL` and `#ifdef PWSH` behave correctly
 - `#elif NUSHELL` and `#elif PWSH` behave correctly
-- `__GRAPES_SHELL` is emitted as `nushell` and `pwsh`
+- `GRAPES_SHELL` is emitted as `nushell` and `pwsh`
 
 ### CLI tests
 

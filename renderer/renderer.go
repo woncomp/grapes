@@ -19,11 +19,11 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 	for _, key := range slices.Sorted(maps.Keys(env)) {
 		switch shell {
 		case "bash", "zsh":
-			lines = append(lines, fmt.Sprintf("export %s=%s", key, quoteValue(shell, env[key])))
+			lines = append(lines, fmt.Sprintf("export %s=%s", key, QuoteValue(shell, env[key])))
 		case "nushell":
-			lines = append(lines, fmt.Sprintf("$env.%s = %s", key, quoteValue(shell, env[key])))
+			lines = append(lines, fmt.Sprintf("$env.%s = %s", key, QuoteValue(shell, env[key])))
 		case "pwsh":
-			lines = append(lines, fmt.Sprintf("$env:%s = %s", key, quoteValue(shell, env[key])))
+			lines = append(lines, fmt.Sprintf("$env:%s = %s", key, QuoteValue(shell, env[key])))
 		}
 	}
 
@@ -31,14 +31,14 @@ func RenderBlock(goos, shell string, env map[string]string, paths []string, body
 		path := paths[i]
 		switch shell {
 		case "bash", "zsh":
-			lines = append(lines, fmt.Sprintf("export PATH=%s:$PATH", quoteValue(shell, path)))
+			lines = append(lines, fmt.Sprintf("export PATH=%s:$PATH", QuoteValue(shell, path)))
 		case "nushell":
-			lines = append(lines, fmt.Sprintf("$env.PATH = ($env.PATH | prepend %s)", quoteValue(shell, path)))
+			lines = append(lines, fmt.Sprintf("$env.PATH = ($env.PATH | prepend %s)", QuoteValue(shell, path)))
 		case "pwsh":
 			lines = append(lines, fmt.Sprintf(
 				"$env:PATH = %s + %s + $env:PATH",
-				quoteValue(shell, path),
-				quoteValue(shell, pwshPathSeparator(goos)),
+				QuoteValue(shell, path),
+				QuoteValue(shell, pwshPathSeparator(goos)),
 			))
 		}
 	}
@@ -59,7 +59,7 @@ func pwshPathSeparator(goos string) string {
 	return ":"
 }
 
-func quoteValue(shell, value string) string {
+func QuoteValue(shell, value string) string {
 	switch shell {
 	case "bash", "zsh":
 		return quotePosixDoubleQuotedValue(value)

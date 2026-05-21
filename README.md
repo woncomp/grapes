@@ -38,6 +38,11 @@ When linking is enabled, `grapes` adds a managed marker block to the shell's nat
 | PowerShell (`powershell`, `pwsh`) | `powershell-env.ps1`, `powershell-profile.ps1` | Both files are dot-sourced from a single profile: on Unix-like systems `~/.config/powershell/Microsoft.PowerShell_profile.ps1`; on Windows `~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` |
 | Nushell (`nushell`, `nu`) | `nushell-env.nu`, `nushell-config.nu` | `nushell-env.nu` is `source-env`'d from `~/.config/nushell/env.nu` on Unix-like systems or `%APPDATA%\nushell\env.nu` on Windows; `nushell-config.nu` is sourced from `~/.config/nushell/config.nu` on Unix-like systems or `%APPDATA%\nushell\config.nu` on Windows |
 
+Generated env files also inject:
+
+- `GRAPES_SHELL`: the canonical target shell name (`bash`, `zsh`, `nushell`, or `pwsh`)
+- `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
+
 ## Disclaimer
 
 This project is still under active development and is not yet ready for general use.

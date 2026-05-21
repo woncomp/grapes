@@ -452,12 +452,13 @@ echo prompt
 		t.Fatal(err)
 	}
 	content := string(data)
-	assertLineContainsFragments(t, content, "$env.__GRAPES_SHELL = ", "nushell")
+	assertLineContainsFragments(t, content, "$env.GRAPES_SHELL = ", "nushell")
+	assertLineContainsFragments(t, content, "$env.GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("nushell", outputDir))
 	assertLineContainsFragments(t, content, "$env.PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env.PATH = ", "prepend", "/tool/bin")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
-	assertLineExcludesFragments(t, content, "__GRAPES_SHELL", "export ")
+	assertLineExcludesFragments(t, content, "GRAPES_SHELL", "export ")
 }
 
 func TestRunNoLinkRendersPwshEnvAndPathsNatively(t *testing.T) {
@@ -509,12 +510,13 @@ echo prompt
 		t.Fatal(err)
 	}
 	content := string(data)
-	assertLineContainsFragments(t, content, "$env:__GRAPES_SHELL = ", "pwsh")
+	assertLineContainsFragments(t, content, "$env:GRAPES_SHELL = ", "pwsh")
+	assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("pwsh", outputDir))
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
-	assertLineExcludesFragments(t, content, "__GRAPES_SHELL", "export ")
+	assertLineExcludesFragments(t, content, "GRAPES_SHELL", "export ")
 }
 
 func TestRunEmitsGrapesShellOnlyInEnvOutput(t *testing.T) {
@@ -566,12 +568,18 @@ echo prompt
 
 	outputDir := expectedRunOutputDir(t, home, appData)
 	envContent := mustReadFile(t, filepath.Join(outputDir, "zshenv"))
-	if got, want := strings.Count(envContent, `__GRAPES_SHELL="zsh"`), 1; got != want {
-		t.Fatalf("env __GRAPES_SHELL count = %d, want %d; content=%q", got, want, envContent)
+	if got, want := strings.Count(envContent, `GRAPES_SHELL="zsh"`), 1; got != want {
+		t.Fatalf("env GRAPES_SHELL count = %d, want %d; content=%q", got, want, envContent)
+	}
+	if got, want := strings.Count(envContent, `GRAPES_OUTPUT_PATH="`+expectedInjectedOutputPath("zsh", outputDir)+`"`), 1; got != want {
+		t.Fatalf("env GRAPES_OUTPUT_PATH count = %d, want %d; content=%q", got, want, envContent)
 	}
 	mainContent := mustReadFile(t, filepath.Join(outputDir, "zshrc"))
-	if strings.Contains(mainContent, "__GRAPES_SHELL") {
-		t.Fatalf("zshrc unexpectedly contained __GRAPES_SHELL: %q", mainContent)
+	if strings.Contains(mainContent, "GRAPES_SHELL") {
+		t.Fatalf("zshrc unexpectedly contained GRAPES_SHELL: %q", mainContent)
+	}
+	if strings.Contains(mainContent, "GRAPES_OUTPUT_PATH") {
+		t.Fatalf("zshrc unexpectedly contained GRAPES_OUTPUT_PATH: %q", mainContent)
 	}
 }
 
@@ -1442,6 +1450,15 @@ func expectedRunOutputDir(t *testing.T, home, appData string) string {
 		return filepath.Join(appData, "grapes")
 	}
 	return filepath.Join(home, ".config", "grapes")
+}
+
+func expectedInjectedOutputPath(shellName string, outputDir string) string {
+	switch shellName {
+	case "bash", "zsh":
+		return strings.ReplaceAll(outputDir, `\`, "/")
+	default:
+		return outputDir
+	}
 }
 
 func writeTempFile(t *testing.T, dir, name, content string) string {

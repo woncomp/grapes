@@ -21,6 +21,6 @@ source ~/.zoxide.nu
 
 #else
 
-eval "$(zoxide init $__GRAPES_SHELL)"
+eval "$(zoxide init $GRAPES_SHELL)"
 
 #endif

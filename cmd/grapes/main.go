@@ -301,9 +301,10 @@ func runWithOptions(opts runOptions) error {
 		for _, phase := range outputPhases {
 			var shellFragments []writer.Fragment
 			if phase == shells.PhaseEnv {
+				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir)
 				shellFragments = append(shellFragments, writer.Fragment{
-					Name:    "__GRAPES_SHELL",
-					Content: preprocessor.ShellInjectionLine(target.Name()) + "\n",
+					Name:    "__GRAPE_ENV",
+					Content: strings.Join(injectedLines, "\n") + "\n",
 				})
 			}
 			for _, f := range sorted {
