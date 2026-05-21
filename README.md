@@ -18,7 +18,7 @@
 
 ## Grape file authoring
 
-For `.grape` / `.grapes` format, phases, frontmatter, dependencies, generated Grapes variables, and authoring examples, see `docs/grapes/grape-file-reference.md`.
+For `.grape` fragments and master `.toml` format, phases, frontmatter, dependencies, generated Grapes variables, and authoring examples, see `docs/grapes/grape-file-reference.md`.
 
 ## Generated files and link targets by shell
 

@@ -19,15 +19,15 @@ func init() {
 }
 
 func TestParseArgsUsesExplicitTargets(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes", "-t", "zsh", "--target=bash", "--nolink"}, func(string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml", "-t", "zsh", "--target=bash", "--nolink"}, func(string) (string, bool) {
 		return "", false
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if opts.masterPath != "master.grapes" {
-		t.Fatalf("masterPath = %q, want master.grapes", opts.masterPath)
+	if opts.masterPath != "master.toml" {
+		t.Fatalf("masterPath = %q, want master.toml", opts.masterPath)
 	}
 	if got, want := joinTargetNames(opts.targets), "zsh, bash"; got != want {
 		t.Fatalf("targets = %q, want %q", got, want)
@@ -38,7 +38,7 @@ func TestParseArgsUsesExplicitTargets(t *testing.T) {
 }
 
 func TestParseArgsSupportsYesFlag(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes", "--yes"}, func(key string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml", "--yes"}, func(key string) (string, bool) {
 		if key == "SHELL" {
 			return "/bin/zsh", true
 		}
@@ -53,7 +53,7 @@ func TestParseArgsSupportsYesFlag(t *testing.T) {
 }
 
 func TestParseArgsSupportsYesShortFlag(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes", "-y"}, func(key string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml", "-y"}, func(key string) (string, bool) {
 		if key == "SHELL" {
 			return "/bin/zsh", true
 		}
@@ -71,7 +71,7 @@ func TestParseArgsSupportsYesShortFlag(t *testing.T) {
 }
 
 func TestParseArgsSupportsDependencyMode(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes", "--dependency-mode=allow-warnings"}, func(key string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml", "--dependency-mode=allow-warnings"}, func(key string) (string, bool) {
 		if key == "SHELL" {
 			return "/bin/zsh", true
 		}
@@ -86,7 +86,7 @@ func TestParseArgsSupportsDependencyMode(t *testing.T) {
 }
 
 func TestParseArgsRejectsInvalidDependencyMode(t *testing.T) {
-	_, err := parseArgs([]string{"master.grapes", "--dependency-mode=weird"}, func(key string) (string, bool) {
+	_, err := parseArgs([]string{"master.toml", "--dependency-mode=weird"}, func(key string) (string, bool) {
 		if key == "SHELL" {
 			return "/bin/zsh", true
 		}
@@ -101,7 +101,7 @@ func TestParseArgsRejectsInvalidDependencyMode(t *testing.T) {
 }
 
 func TestParseArgsRejectsYesWithConflictingDependencyMode(t *testing.T) {
-	_, err := parseArgs([]string{"master.grapes", "--yes", "--dependency-mode=fail"}, func(key string) (string, bool) {
+	_, err := parseArgs([]string{"master.toml", "--yes", "--dependency-mode=fail"}, func(key string) (string, bool) {
 		if key == "SHELL" {
 			return "/bin/zsh", true
 		}
@@ -116,7 +116,7 @@ func TestParseArgsRejectsYesWithConflictingDependencyMode(t *testing.T) {
 }
 
 func TestParseArgsUsesExplicitTargetAlias(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes", "-t", "nu"}, func(string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml", "-t", "nu"}, func(string) (string, bool) {
 		return "", false
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func TestParseArgsUsesExplicitTargetAlias(t *testing.T) {
 }
 
 func TestParseArgsUsesPwshTarget(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes", "-t", "pwsh"}, func(string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml", "-t", "pwsh"}, func(string) (string, bool) {
 		return "", false
 	})
 	if err != nil {
@@ -142,7 +142,7 @@ func TestParseArgsUsesPwshTarget(t *testing.T) {
 }
 
 func TestParseArgsRejectsLegacyWindowsPSTargetName(t *testing.T) {
-	_, err := parseArgs([]string{"master.grapes", "-t", "powershell"}, func(string) (string, bool) {
+	_, err := parseArgs([]string{"master.toml", "-t", "powershell"}, func(string) (string, bool) {
 		return "", false
 	})
 	if err == nil {
@@ -154,7 +154,7 @@ func TestParseArgsRejectsLegacyWindowsPSTargetName(t *testing.T) {
 }
 
 func TestParseArgsDefaultsToDetectedShell(t *testing.T) {
-	opts, err := parseArgs([]string{"master.grapes"}, func(key string) (string, bool) {
+	opts, err := parseArgs([]string{"master.toml"}, func(key string) (string, bool) {
 		if key == "SHELL" {
 			return "/bin/zsh", true
 		}
@@ -170,7 +170,7 @@ func TestParseArgsDefaultsToDetectedShell(t *testing.T) {
 }
 
 func TestParseArgsFailsWithoutDetectableShell(t *testing.T) {
-	_, err := parseArgsWithShellDetector([]string{"master.grapes"}, func(string) (string, bool) {
+	_, err := parseArgsWithShellDetector([]string{"master.toml"}, func(string) (string, bool) {
 		return "", false
 	}, func(func(string) (string, bool)) (shells.Shell, error) {
 		return nil, errors.New("could not detect current shell")
@@ -184,7 +184,7 @@ func TestParseArgsFailsWithoutDetectableShell(t *testing.T) {
 }
 
 func TestParseArgsRejectsUnsupportedTarget(t *testing.T) {
-	_, err := parseArgs([]string{"master.grapes", "-t", "fish"}, func(string) (string, bool) {
+	_, err := parseArgs([]string{"master.toml", "-t", "fish"}, func(string) (string, bool) {
 		return "", false
 	})
 	if err == nil {
@@ -254,10 +254,8 @@ func TestRunNoLinkGeneratesOnlySelectedTargets(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `---
 phase: env
@@ -317,10 +315,8 @@ func TestRunNoLinkPreservesPreviouslyGeneratedOtherShellOutputs(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `---
 phase: env
@@ -377,10 +373,8 @@ func TestRunExecutesSetupPhaseOnceWithoutLinking(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - setup
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "setup"
 `)
 	writeTempFile(t, sourceDir, "setup.grape", `---
 phase: setup
@@ -442,10 +436,8 @@ func TestRunNoLinkReportsGeneratedFilesWithFullPaths(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `---
 phase: env
@@ -495,10 +487,8 @@ func TestRunNoLinkRendersNushellEnvAndPathsNatively(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `---
 phase: env
@@ -554,10 +544,8 @@ func TestRunNoLinkRendersPwshEnvAndPathsNatively(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `---
 phase: env
@@ -616,12 +604,14 @@ func TestRunEmitsGrapesShellOnlyInEnvOutput(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - env-one
-  - env-two
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "env-one"
+
+[[grape]]
+import = "env-two"
+
+[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "env-one.grape", `---
 phase: env
@@ -695,15 +685,23 @@ func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForNushell(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - go
-  - bun
-  - fnm
-  - uv
-  - zoxide
-  - fzf
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "go"
+
+[[grape]]
+import = "bun"
+
+[[grape]]
+import = "fnm"
+
+[[grape]]
+import = "uv"
+
+[[grape]]
+import = "zoxide"
+
+[[grape]]
+import = "fzf"
 `)
 	copyExampleFragments(t, sourceDir, "go", "bun", "fnm", "uv", "zoxide", "fzf")
 
@@ -766,15 +764,23 @@ func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForPwsh(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - go
-  - bun
-  - fnm
-  - uv
-  - zoxide
-  - fzf
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "go"
+
+[[grape]]
+import = "bun"
+
+[[grape]]
+import = "fnm"
+
+[[grape]]
+import = "uv"
+
+[[grape]]
+import = "zoxide"
+
+[[grape]]
+import = "fzf"
 `)
 	copyExampleFragments(t, sourceDir, "go", "bun", "fnm", "uv", "zoxide", "fzf")
 
@@ -852,10 +858,8 @@ func TestRunDependencyChecksExecutableDependencyRendersWhenBinaryExists(t *testi
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - fnm
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "fnm"
 `)
 	writeTempFile(t, sourceDir, "fnm.grape", `---
 phase: main
@@ -899,11 +903,11 @@ func TestRunEmitsScopedExecEnvironmentPerGrapeAndCleansUpAtFileEnd(t *testing.T)
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - fnm
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "fnm"
+
+[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "fnm.grape", `---
 phase: main
@@ -963,10 +967,8 @@ func TestRunDependencyChecksExecutableDependencySkipsWhenBinaryMissing(t *testin
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - fnm
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "fnm"
 `)
 	writeTempFile(t, sourceDir, "fnm.grape", `---
 phase: main
@@ -1013,12 +1015,14 @@ func TestRunDependencyChecksSafeModeSkipsWarningsAndFailures(t *testing.T) {
 	createExecutable(t, binDir, "oktool", "echo oktool 1.2.3")
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - ok
-  - warn
-  - miss
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "ok"
+
+[[grape]]
+import = "warn"
+
+[[grape]]
+import = "miss"
 `)
 	writeTempFile(t, sourceDir, "ok.grape", `---
 phase: main
@@ -1086,10 +1090,8 @@ func TestRunDependencyChecksAllowWarningsModeRendersWarnings(t *testing.T) {
 	}
 
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - warn
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
 `)
 	writeTempFile(t, sourceDir, "warn.grape", `---
 phase: main
@@ -1133,10 +1135,8 @@ func TestRunDependencyChecksDependencyModeSafeSkipsWarnings(t *testing.T) {
 	}
 
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - warn
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
 `)
 	writeTempFile(t, sourceDir, "warn.grape", `---
 phase: main
@@ -1182,10 +1182,8 @@ func TestRunDependencyChecksDependencyModeAllowWarningsRendersWarnings(t *testin
 	}
 
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - warn
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
 `)
 	writeTempFile(t, sourceDir, "warn.grape", `---
 phase: main
@@ -1230,10 +1228,8 @@ func TestRunDependencyChecksDependencyModeFailExitsOnWarnings(t *testing.T) {
 	}
 
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - warn
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
 `)
 	writeTempFile(t, sourceDir, "warn.grape", `---
 phase: main
@@ -1281,10 +1277,8 @@ func TestRunDependencyChecksYesSkipsWarnings(t *testing.T) {
 	}
 
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - warn
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
 `)
 	writeTempFile(t, sourceDir, "warn.grape", `---
 phase: main
@@ -1330,10 +1324,8 @@ func TestRunDependencyChecksFailWhenNonInteractiveWithoutYes(t *testing.T) {
 	}
 
 	createExecutable(t, binDir, "warntool", "echo warntool unknown")
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - warn
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "warn"
 `)
 	writeTempFile(t, sourceDir, "warn.grape", `---
 phase: main
@@ -1375,10 +1367,8 @@ func TestRunLinksOnlySelectedTarget(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
 `)
@@ -1421,10 +1411,8 @@ func TestRunReviewApproveInstallsAllLinks(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
 `)
@@ -1467,10 +1455,8 @@ func TestRunReviewRejectSkipsAllLinks(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
 `)
@@ -1511,10 +1497,8 @@ func TestRunReviewSkipsPromptWhenAlreadyUpToDate(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
 `)
@@ -1567,10 +1551,8 @@ func TestRunReviewYesInstallsWithoutPrompt(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
 `)
@@ -1609,10 +1591,8 @@ func TestRunReviewFailsWhenPromptingNonInteractive(t *testing.T) {
 		t.Setenv("APPDATA", appData)
 	}
 
-	masterPath := writeTempFile(t, sourceDir, "master.grapes", `---
-imports:
-  - prompt
----
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+import = "prompt"
 `)
 	writeTempFile(t, sourceDir, "prompt.grape", `echo prompt
 `)
@@ -1632,6 +1612,101 @@ imports:
 	}
 	if !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunLoadsMasterImportsFromMultipleDirectories(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+from = "local"
+import = "tool"
+
+[[grape]]
+from = "shared"
+import = "tool.grape"
+`)
+	writeTempFile(t, filepath.Join(sourceDir, "local"), "tool.grape", `echo local-tool
+`)
+	writeTempFile(t, filepath.Join(sourceDir, "shared"), "tool.grape", `echo shared-tool
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	if !strings.Contains(mainContent, "# ==== grape: local/tool") {
+		t.Fatalf("bashrc missing local/tool label: %q", mainContent)
+	}
+	if !strings.Contains(mainContent, "# ==== grape: shared/tool") {
+		t.Fatalf("bashrc missing shared/tool label: %q", mainContent)
+	}
+	if !strings.Contains(mainContent, "echo local-tool") || !strings.Contains(mainContent, "echo shared-tool") {
+		t.Fatalf("bashrc missing expected fragment bodies: %q", mainContent)
+	}
+}
+
+func TestRunDeduplicatesNormalizedMasterImports(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	sourceDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	masterPath := writeTempFile(t, sourceDir, "master.toml", `[[grape]]
+from = "local"
+import = "tool"
+
+[[grape]]
+from = "local"
+import = "./tool.grape"
+`)
+	writeTempFile(t, filepath.Join(sourceDir, "local"), "tool.grape", `echo local-tool
+`)
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath: masterPath,
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	if got := strings.Count(mainContent, "# ==== grape: local/tool"); got != 1 {
+		t.Fatalf("local/tool rendered %d times, want 1: %q", got, mainContent)
+	}
+	if got := strings.Count(mainContent, "echo local-tool"); got != 1 {
+		t.Fatalf("fragment body rendered %d times, want 1: %q", got, mainContent)
 	}
 }
 

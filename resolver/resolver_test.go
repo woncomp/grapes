@@ -7,35 +7,41 @@ import (
 	"github.com/woncomp/grapes/parser"
 )
 
-func makeGrape(name string) *parser.GrapeFile {
+func makeGrape(key, label string) *parser.GrapeFile {
 	return &parser.GrapeFile{
-		Name:   name,
+		Name:   label,
+		Label:  label,
+		Key:    key,
 		Blocks: []parser.Block{{Phase: "main"}},
 	}
 }
 
 func TestResolveImportsInOrder(t *testing.T) {
 	grapes := []*parser.GrapeFile{
-		makeGrape("prompt"),
-		makeGrape("path"),
-		makeGrape("aliases"),
+		makeGrape("prompt.grape", "prompt"),
+		makeGrape("shared/path.grape", "shared/path"),
+		makeGrape("aliases.grape", "aliases"),
 	}
-	imports := []string{"aliases", "path", "prompt"}
+	imports := []parser.GrapeImport{
+		{Key: "aliases.grape", Label: "aliases"},
+		{Key: "shared/path.grape", Label: "shared/path"},
+		{Key: "prompt.grape", Label: "prompt"},
+	}
 
 	resolved, err := Resolve(imports, grapes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got := namesOf(resolved)
-	want := []string{"aliases", "path", "prompt"}
+	got := labelsOf(resolved)
+	want := []string{"aliases", "shared/path", "prompt"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("Resolve() = %v, want %v", got, want)
 	}
 }
 
 func TestResolveRejectsMissingImportedGrape(t *testing.T) {
-	_, err := Resolve([]string{"missing"}, []*parser.GrapeFile{makeGrape("prompt")})
+	_, err := Resolve([]parser.GrapeImport{{Key: "missing.grape", Label: "missing"}}, []*parser.GrapeFile{makeGrape("prompt.grape", "prompt")})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -45,7 +51,10 @@ func TestResolveRejectsMissingImportedGrape(t *testing.T) {
 }
 
 func TestResolveIncludesDuplicatesOnlyOnce(t *testing.T) {
-	resolved, err := Resolve([]string{"prompt", "prompt"}, []*parser.GrapeFile{makeGrape("prompt")})
+	resolved, err := Resolve([]parser.GrapeImport{
+		{Key: "prompt.grape", Label: "prompt"},
+		{Key: "prompt.grape", Label: "prompt"},
+	}, []*parser.GrapeFile{makeGrape("prompt.grape", "prompt")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,10 +63,10 @@ func TestResolveIncludesDuplicatesOnlyOnce(t *testing.T) {
 	}
 }
 
-func namesOf(grapes []*parser.GrapeFile) []string {
+func labelsOf(grapes []*parser.GrapeFile) []string {
 	names := make([]string, len(grapes))
 	for i, grape := range grapes {
-		names[i] = grape.Name
+		names[i] = grape.Label
 	}
 	return names
 }

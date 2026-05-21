@@ -9,8 +9,8 @@ The `grapes` CLI entry point lives at `./cmd/grapes`.
 Prefer `go run` so day-to-day testing does not leave build artifacts in the repository:
 
 ```bash
-go run ./cmd/grapes ./docs/grapes/master.grapes
-go run ./cmd/grapes ./docs/grapes/master.grapes -t zsh
+go run ./cmd/grapes ./docs/grapes.toml
+go run ./cmd/grapes ./docs/grapes.toml -t zsh
 ```
 
 ### Local executable builds
@@ -33,7 +33,7 @@ The repository's `.goreleaser.yml` builds `./cmd/grapes` for `linux`, `darwin`, 
 
 ## Fragment authoring guidance
 
-The single source of truth for `.grape` / `.grapes` authoring guidance is `./docs/grapes/grape-file-reference.md`.
+The single source of truth for `.grape` / master `.toml` authoring guidance is `./docs/grapes/grape-file-reference.md`.
 
 When you add or revise grape-file format guidance, fragment authoring guidance, frontmatter semantics, generated Grapes variables, or example authoring patterns, update that file instead of spreading the content across README files, specs, or other docs.
 

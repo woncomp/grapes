@@ -20,6 +20,8 @@ type DependFile struct {
 
 type GrapeFile struct {
 	Name             string
+	Label            string
+	Key              string
 	Path             string
 	DependExecutable *DependExecutable
 	DependFile       *DependFile
@@ -36,7 +38,7 @@ func ParseGrapeFile(path string) (*GrapeFile, error) {
 }
 
 func ParseGrapeString(name, content, path string) (*GrapeFile, error) {
-	grape := &GrapeFile{Name: name, Path: path}
+	grape := &GrapeFile{Name: name, Label: name, Key: name, Path: path}
 
 	rawBlocks, err := splitBlocks(content)
 	if err != nil {

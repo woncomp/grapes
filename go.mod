@@ -2,4 +2,7 @@ module github.com/woncomp/grapes
 
 go 1.26.1
 
-require gopkg.in/yaml.v3 v3.0.1 // indirect
+require (
+	github.com/pelletier/go-toml/v2 v2.2.4
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)

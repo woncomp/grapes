@@ -6,26 +6,36 @@ import (
 	"github.com/woncomp/grapes/parser"
 )
 
-// Resolve takes the import list from the .grapes file and all known grapes,
+// Resolve takes the ordered import list from the master TOML file and all known grapes,
 // validates that each imported grape exists, and returns them in import order.
-func Resolve(imports []string, grapes []*parser.GrapeFile) ([]*parser.GrapeFile, error) {
+func Resolve(imports []parser.GrapeImport, grapes []*parser.GrapeFile) ([]*parser.GrapeFile, error) {
 	grapeMap := make(map[string]*parser.GrapeFile, len(grapes))
 	for _, grape := range grapes {
-		grapeMap[grape.Name] = grape
+		grapeMap[grapeIdentityKey(grape)] = grape
 	}
 
 	resolved := make([]*parser.GrapeFile, 0, len(imports))
 	seen := make(map[string]bool, len(imports))
-	for _, name := range imports {
-		if seen[name] {
+	for _, imp := range imports {
+		if seen[imp.Key] {
 			continue
 		}
-		grape, ok := grapeMap[name]
+		grape, ok := grapeMap[imp.Key]
 		if !ok {
-			return nil, fmt.Errorf("missing fragment: %s", name)
+			return nil, fmt.Errorf("missing fragment: %s", imp.Label)
 		}
-		seen[name] = true
+		seen[imp.Key] = true
 		resolved = append(resolved, grape)
 	}
 	return resolved, nil
+}
+
+func grapeIdentityKey(grape *parser.GrapeFile) string {
+	if grape == nil {
+		return ""
+	}
+	if grape.Key != "" {
+		return grape.Key
+	}
+	return grape.Name
 }

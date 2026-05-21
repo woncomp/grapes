@@ -1,13 +1,13 @@
 # Grapes file authoring reference
 
-This document is the single source of truth for authoring and documenting `.grape` and `.grapes` files in this repository.
+This document is the single source of truth for authoring and documenting `.grape` fragment files and master `.toml` files in this repository.
 
-Repository examples live in `docs/grapes/`. `grapes` resolves imports from the same directory as the input `.grapes` file only, so these checked-in files are examples and local starting points rather than embedded runtime defaults.
+Repository examples live in `docs/grapes/`, with the example master file at `docs/grapes.toml`. Master-file imports resolve relative to the input master file, so these checked-in files are examples and local starting points rather than embedded runtime defaults.
 
 ## File types
 
 - **`.grape`**: reusable fragment files.
-- **`.grapes`**: master files that declare the fragment import list and act as the CLI entry point.
+- **`.toml`**: master files that declare the fragment import list and act as the CLI entry point.
 
 ## `.grape` block model
 
@@ -44,23 +44,29 @@ Field behavior:
 
 Subsequent blocks may change `phase`, `env`, `paths`, and `body`, but not `deps`.
 
-## `.grapes` master file model
+## Master `.toml` file model
 
-Master files use first-block frontmatter with `imports`:
+Master files use an ordered TOML array of `[[grape]]` tables:
 
-```yaml
----
-imports:
-  - go
-  - fnm
-  - prompt
----
+```toml
+[[grape]]
+import = "go"
+
+[[grape]]
+import = "fnm"
+
+[[grape]]
+from = "shared"
+import = "prompt.grape"
 ```
 
 Behavior:
 
-- `imports` is only meaningful on the first block of a `.grapes` file.
-- each import resolves to `<name>.grape` in the same directory as the input `.grapes` file
+- each `[[grape]]` entry is order-sensitive
+- `import` is required and may be extensionless or an explicit `.grape` relative path
+- `from` is optional; when omitted, Grapes resolves the import from the same directory as the master `.toml` file
+- `from` and `import` both support subdirectories plus `.` and `..`
+- duplicate imports that normalize to the same fragment path are de-duplicated after the first occurrence
 - only reachable imported fragments are processed
 
 ## Phases
@@ -176,7 +182,7 @@ Behavior:
 Generated `env` outputs inject:
 
 - `GRAPES_SHELL`: the canonical target shell name
-- `GRAPES_HOME`: the directory that contains the master `.grapes` file
+- `GRAPES_HOME`: the directory that contains the master `.toml` file
 - `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
 - `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`
 
@@ -216,11 +222,13 @@ paths:
 
 ### Master file
 
-```yaml
----
-imports:
-  - go
-  - fnm
-  - zoxide
----
+```toml
+[[grape]]
+import = "go"
+
+[[grape]]
+import = "fnm"
+
+[[grape]]
+import = "zoxide"
 ```

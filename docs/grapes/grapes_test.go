@@ -21,8 +21,18 @@ func TestAllExampleFragmentsExist(t *testing.T) {
 }
 
 func TestExampleMasterFileExists(t *testing.T) {
-	if _, err := os.Stat("master.grapes"); err != nil {
-		t.Fatalf("master.grapes not found: %v", err)
+	if _, err := os.Stat(filepath.Join("..", "grapes.toml")); err != nil {
+		t.Fatalf("docs/grapes.toml not found: %v", err)
+	}
+}
+
+func TestExampleMasterFileParses(t *testing.T) {
+	grapes, err := parser.ParseGrapesFile(filepath.Join("..", "grapes.toml"))
+	if err != nil {
+		t.Fatalf("ParseGrapesFile failed: %v", err)
+	}
+	if len(grapes.Imports) == 0 {
+		t.Fatal("docs/grapes.toml has no imports")
 	}
 }
 

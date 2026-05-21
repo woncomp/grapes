@@ -1,0 +1,8 @@
+[[grape]]
+import = "zoxide"
+
+[[grape]]
+import = "fnm"
+
+[[grape]]
+import = "starship"

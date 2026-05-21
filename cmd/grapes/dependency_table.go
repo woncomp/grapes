@@ -3,13 +3,15 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/woncomp/grapes/parser"
 )
 
 func renderDependencyTable(results []grapeDependencyResult, allowWarnings bool) string {
 	rows := [][]string{{"GRAPE", "DEPENDENCY", "STATUS", "LOCATION", "VERSION", "RENDER"}}
 	for _, result := range results {
 		rows = append(rows, []string{
-			result.Grape.Name,
+			grapeDisplayName(result.Grape),
 			result.Dependency,
 			string(result.Status),
 			result.Location,
@@ -42,9 +44,19 @@ func renderDependencyTable(results []grapeDependencyResult, allowWarnings bool) 
 		if result.Detail == "" {
 			continue
 		}
-		fmt.Fprintf(&b, "- %s: %s\n", result.Grape.Name, result.Detail)
+		fmt.Fprintf(&b, "- %s: %s\n", grapeDisplayName(result.Grape), result.Detail)
 	}
 	return b.String()
+}
+
+func grapeDisplayName(grape *parser.GrapeFile) string {
+	if grape == nil {
+		return ""
+	}
+	if strings.TrimSpace(grape.Label) != "" {
+		return grape.Label
+	}
+	return grape.Name
 }
 
 func renderDecision(status dependencyStatus, allowWarnings bool) string {

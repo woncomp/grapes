@@ -284,8 +284,8 @@ func runWithOptions(opts runOptions) error {
 		return err
 	}
 
-	if filepath.Ext(opts.masterPath) != ".grapes" {
-		return fmt.Errorf("%s is not a .grapes file", opts.masterPath)
+	if filepath.Ext(opts.masterPath) != ".toml" {
+		return fmt.Errorf("%s is not a .toml file", opts.masterPath)
 	}
 	if err := ensureRuntimeDirs(opts.goos, lookupEnv, outputDir); err != nil {
 		return err
@@ -305,7 +305,7 @@ func runWithOptions(opts runOptions) error {
 	if err != nil {
 		return fmt.Errorf("resolving master directory %s: %w", fragDir, err)
 	}
-	grapes, err := parseAllGrapes(fragDir, grapesFile.Imports)
+	grapes, err := parseAllGrapes(grapesFile.Imports)
 	if err != nil {
 		return err
 	}
@@ -361,29 +361,29 @@ func runWithOptions(opts runOptions) error {
 				})
 			}
 			for _, f := range sorted {
-				result := dependencyResultsByGrape[f.Name]
+				result := dependencyResultsByGrape[f.Key]
 				for _, block := range f.Blocks {
 					if block.Phase != phase {
 						continue
 					}
 					rendered, err := renderer.RenderBlock(opts.goos, target.Name(), block.Env, block.Paths, block.Body)
 					if err != nil {
-						return fmt.Errorf("rendering %s for %s: %w", f.Name, target.Name(), err)
+						return fmt.Errorf("rendering %s for %s: %w", f.Label, target.Name(), err)
 					}
 
 					content, err := preprocessor.Process(rendered, target.Name())
 					if err != nil {
-						return fmt.Errorf("preprocessing %s for %s: %w", f.Name, target.Name(), err)
+						return fmt.Errorf("preprocessing %s for %s: %w", f.Label, target.Name(), err)
 					}
 					if strings.TrimSpace(content) == "" {
 						continue
 					}
 					scopePrefix, err := renderGrapeScopePrefix(target.Name(), result)
 					if err != nil {
-						return fmt.Errorf("rendering grape scope for %s in %s: %w", f.Name, target.Name(), err)
+						return fmt.Errorf("rendering grape scope for %s in %s: %w", f.Label, target.Name(), err)
 					}
 					shellFragments = append(shellFragments, writer.Fragment{
-						Name:    f.Name,
+						Name:    f.Label,
 						Content: scopePrefix + content,
 					})
 					hasGrapeFragments = true
@@ -541,12 +541,12 @@ func printLinkFiles(stdout io.Writer, reports []linkReport) {
 func filterRenderableGrapes(grapes []*parser.GrapeFile, results []grapeDependencyResult, allowWarnings bool) []*parser.GrapeFile {
 	resultByName := make(map[string]grapeDependencyResult, len(results))
 	for _, result := range results {
-		resultByName[result.Grape.Name] = result
+		resultByName[grapeIdentityKey(result.Grape)] = result
 	}
 
 	filtered := make([]*parser.GrapeFile, 0, len(grapes))
 	for _, grape := range grapes {
-		result, ok := resultByName[grape.Name]
+		result, ok := resultByName[grapeIdentityKey(grape)]
 		if !ok {
 			continue
 		}
@@ -565,9 +565,19 @@ func filterRenderableGrapes(grapes []*parser.GrapeFile, results []grapeDependenc
 func mapDependencyResultsByGrape(results []grapeDependencyResult) map[string]grapeDependencyResult {
 	byGrape := make(map[string]grapeDependencyResult, len(results))
 	for _, result := range results {
-		byGrape[result.Grape.Name] = result
+		byGrape[grapeIdentityKey(result.Grape)] = result
 	}
 	return byGrape
+}
+
+func grapeIdentityKey(grape *parser.GrapeFile) string {
+	if grape == nil {
+		return ""
+	}
+	if strings.TrimSpace(grape.Key) != "" {
+		return grape.Key
+	}
+	return grape.Name
 }
 
 func renderGrapeScopePrefix(shell string, result grapeDependencyResult) (string, error) {
@@ -626,19 +636,21 @@ func executeManagedSetup(shell shells.Shell, scriptPath string) error {
 	return nil
 }
 
-// parseAllGrapes loads the named .grape files referenced by the .grapes file.
-func parseAllGrapes(dir string, imports []string) ([]*parser.GrapeFile, error) {
+// parseAllGrapes loads the .grape files referenced by the master TOML file.
+func parseAllGrapes(imports []parser.GrapeImport) ([]*parser.GrapeFile, error) {
 	seen := make(map[string]bool)
 	var grapes []*parser.GrapeFile
-	for _, name := range imports {
-		if seen[name] {
+	for _, imp := range imports {
+		if seen[imp.Key] {
 			continue
 		}
-		seen[name] = true
-		grape, err := parser.ParseGrapeFile(filepath.Join(dir, name+".grape"))
+		seen[imp.Key] = true
+		grape, err := parser.ParseGrapeFile(imp.ResolvedPath)
 		if err != nil {
 			return nil, err
 		}
+		grape.Label = imp.Label
+		grape.Key = imp.Key
 		grapes = append(grapes, grape)
 	}
 	return grapes, nil

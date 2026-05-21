@@ -13,7 +13,7 @@ This design extends Grapes so `env` and `paths` render natively for every suppor
 
 ## Goals
 
-- Keep `.grape` and `.grapes` frontmatter unchanged for users.
+- Keep `.grape` fragment frontmatter unchanged for users; this design does not change the separate master `.toml` format.
 - Preserve the existing `env` and `main` phase model.
 - Render `env` and `paths` using shell-native syntax for:
   - `bash`

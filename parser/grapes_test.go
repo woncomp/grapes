@@ -1,14 +1,19 @@
 package parser
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestParseGrapesFile(t *testing.T) {
 	dir := t.TempDir()
-	path := writeTempFile(t, dir, "shell.grapes", `---
-imports:
-  - path
-  - prompt
----
+	path := writeTempFile(t, dir, "shell.toml", `
+[[grape]]
+import = "path"
+
+[[grape]]
+from = "shared"
+import = "prompt.grape"
 `)
 
 	grapes, err := ParseGrapesFile(path)
@@ -22,19 +27,68 @@ imports:
 	if got, want := len(grapes.Imports), 2; got != want {
 		t.Fatalf("len(Imports) = %d, want %d", got, want)
 	}
-	if got, want := grapes.Imports[0], "path"; got != want {
-		t.Fatalf("Imports[0] = %q, want %q", got, want)
+
+	first := grapes.Imports[0]
+	if got, want := first.Import, "path"; got != want {
+		t.Fatalf("Imports[0].Import = %q, want %q", got, want)
 	}
-	if got, want := grapes.Imports[1], "prompt"; got != want {
-		t.Fatalf("Imports[1] = %q, want %q", got, want)
+	if got, want := first.Label, "path"; got != want {
+		t.Fatalf("Imports[0].Label = %q, want %q", got, want)
+	}
+	if got, want := first.Key, "path.grape"; got != want {
+		t.Fatalf("Imports[0].Key = %q, want %q", got, want)
+	}
+	if got, want := first.ResolvedPath, filepath.Join(dir, "path.grape"); got != want {
+		t.Fatalf("Imports[0].ResolvedPath = %q, want %q", got, want)
+	}
+
+	second := grapes.Imports[1]
+	if got, want := second.From, "shared"; got != want {
+		t.Fatalf("Imports[1].From = %q, want %q", got, want)
+	}
+	if got, want := second.Import, "prompt.grape"; got != want {
+		t.Fatalf("Imports[1].Import = %q, want %q", got, want)
+	}
+	if got, want := second.Label, "shared/prompt"; got != want {
+		t.Fatalf("Imports[1].Label = %q, want %q", got, want)
+	}
+	if got, want := second.Key, "shared/prompt.grape"; got != want {
+		t.Fatalf("Imports[1].Key = %q, want %q", got, want)
+	}
+	if got, want := second.ResolvedPath, filepath.Join(dir, "shared", "prompt.grape"); got != want {
+		t.Fatalf("Imports[1].ResolvedPath = %q, want %q", got, want)
 	}
 }
 
-func TestParseGrapesFileInvalidYAML(t *testing.T) {
+func TestParseGrapesFileSupportsParentRelativeImport(t *testing.T) {
 	dir := t.TempDir()
-	path := writeTempFile(t, dir, "bad.grapes", `---
-{{not yaml
----
+	writeTempFile(t, filepath.Join(dir, "masters"), "keep.txt", "")
+	path := writeTempFile(t, filepath.Join(dir, "masters"), "shell.toml", `
+[[grape]]
+import = "../shared/prompt.grape"
+`)
+
+	grapes, err := ParseGrapesFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := grapes.Imports[0].Key, "../shared/prompt.grape"; got != want {
+		t.Fatalf("Imports[0].Key = %q, want %q", got, want)
+	}
+	if got, want := grapes.Imports[0].Label, "../shared/prompt"; got != want {
+		t.Fatalf("Imports[0].Label = %q, want %q", got, want)
+	}
+	if got, want := grapes.Imports[0].ResolvedPath, filepath.Join(dir, "shared", "prompt.grape"); got != want {
+		t.Fatalf("Imports[0].ResolvedPath = %q, want %q", got, want)
+	}
+}
+
+func TestParseGrapesFileInvalidTOML(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, "bad.toml", `
+[[grape]]
+import = "path
 `)
 
 	_, err := ParseGrapesFile(path)
@@ -43,11 +97,11 @@ func TestParseGrapesFileInvalidYAML(t *testing.T) {
 	}
 }
 
-func TestParseGrapesFileUnterminatedFrontmatter(t *testing.T) {
+func TestParseGrapesFileRejectsMissingImport(t *testing.T) {
 	dir := t.TempDir()
-	path := writeTempFile(t, dir, "bad.grapes", `---
-imports:
-  - path
+	path := writeTempFile(t, dir, "bad.toml", `
+[[grape]]
+from = "shared"
 `)
 
 	_, err := ParseGrapesFile(path)
@@ -57,7 +111,7 @@ imports:
 }
 
 func TestParseGrapesFileNonExistent(t *testing.T) {
-	_, err := ParseGrapesFile("/nonexistent/path.grapes")
+	_, err := ParseGrapesFile("/nonexistent/path.toml")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

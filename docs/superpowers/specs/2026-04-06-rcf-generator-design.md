@@ -2,20 +2,20 @@
 
 ## Overview
 
-Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.grapes` file, Grapes loads the referenced `.grape` fragments from the same directory, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.config/grapes/`, and optionally links the user's rc files back to those managed outputs.
+Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.toml` file, Grapes loads the referenced `.grape` fragments, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.config/grapes/`, and optionally links the user's rc files back to those managed outputs.
 
 The current implementation targets `bash` and `zsh`. A run can generate one or more selected shells and defaults to the current shell when no target is specified.
 
 ## Grape file format reference
 
-For `.grape` / `.grapes` authoring details, frontmatter semantics, phase guidance, dependency fields, and generated Grapes variables, see `docs/grapes/grape-file-reference.md`.
+For `.grape` / master `.toml` authoring details, frontmatter semantics, phase guidance, dependency fields, and generated Grapes variables, see `docs/grapes/grape-file-reference.md`.
 
 ## Processing Pipeline
 
 ```text
-master.grapes
+docs/grapes.toml
   -> parser.ParseFile
-  -> same-directory fragment discovery
+  -> master-relative fragment resolution
   -> resolver.Resolve
   -> preprocessor.Process per selected shell and block
   -> writer.Write managed files into ~/.config/grapes/
@@ -27,11 +27,11 @@ master.grapes
 1. **CLI (`cmd/grapes`)**
    - Parses arguments.
    - Detects the current shell from `$SHELL` when `-t/--target` is omitted.
-   - Requires a `.grapes` master file.
+   - Requires a `.toml` master file.
    - Orchestrates parsing, resolution, preprocessing, writing, and optional linking.
 
 2. **Parser (`parser`)**
-   - Parses `.grape` and `.grapes` files into `Fragment` values.
+   - Parses `.grape` fragments and master `.toml` files into `Fragment` values.
    - Supports multi-block documents.
    - Validates phase and frontmatter rules described in the grape authoring reference.
 
@@ -73,19 +73,19 @@ Unknown `#...` lines are treated as invalid directives and produce an error with
 ### Basic usage
 
 ```bash
-go run ./cmd/grapes ./docs/grapes/master.grapes
+go run ./cmd/grapes ./docs/grapes.toml
 ```
 
 ### Explicit targets
 
 ```bash
-go run ./cmd/grapes ./docs/grapes/master.grapes -t zsh --target=bash
+go run ./cmd/grapes ./docs/grapes.toml -t zsh --target=bash
 ```
 
 ### Generate without linking rc files
 
 ```bash
-go run ./cmd/grapes ./docs/grapes/master.grapes --nolink
+go run ./cmd/grapes ./docs/grapes.toml --nolink
 ```
 
 Behavior:
@@ -157,7 +157,8 @@ resolver/         dependency ordering and cycle detection
 preprocessor/     shell directive evaluation
 writer/           managed file output
 shells/           shell metadata and rc-file linking
-docs/grapes/      example `.grape` and `.grapes` files
+docs/             example `grapes.toml`
+docs/grapes/      example `.grape` fragments
 docs/superpowers/ design spec and as-built plan
 ```
 
