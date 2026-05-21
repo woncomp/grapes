@@ -1401,8 +1401,9 @@ imports:
 	assertFileMissing(t, filepath.Join(home, ".zshenv"))
 	assertFileMissing(t, filepath.Join(home, ".zshrc"))
 
-	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
-	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+	assertFileMissing(t, filepath.Join(home, ".bashenv"))
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashenv"))+`"`)
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashrc"))+`"`)
 }
 
 func TestRunReviewApproveInstallsAllLinks(t *testing.T) {
@@ -1438,12 +1439,11 @@ imports:
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
-	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashrc"))+`"`)
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashenv"))+`"`)
 	text := stdout.String()
 	for _, fragment := range []string{
 		"Linked files:",
-		"linked " + filepath.Join(home, ".bashenv"),
 		"linked " + filepath.Join(home, ".bashrc"),
 	} {
 		if !strings.Contains(text, fragment) {
@@ -1484,12 +1484,10 @@ imports:
 		t.Fatal(err)
 	}
 
-	assertFileMissing(t, filepath.Join(home, ".bashenv"))
 	assertFileMissing(t, filepath.Join(home, ".bashrc"))
 	text := stdout.String()
 	for _, fragment := range []string{
 		"Linked files:",
-		"skipped " + filepath.Join(home, ".bashenv"),
 		"skipped " + filepath.Join(home, ".bashrc"),
 	} {
 		if !strings.Contains(text, fragment) {
@@ -1521,10 +1519,10 @@ imports:
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := shells.Install(filepath.Join(home, ".bashenv"), []string{`source "` + filepath.Join(outputDir, "bashenv") + `"`}); err != nil {
-		t.Fatal(err)
-	}
-	if err := shells.Install(filepath.Join(home, ".bashrc"), []string{`source "` + filepath.Join(outputDir, "bashrc") + `"`}); err != nil {
+	if err := shells.Install(filepath.Join(home, ".bashrc"), []string{
+		`source "` + filepath.ToSlash(filepath.Join(outputDir, "bashenv")) + `"`,
+		`source "` + filepath.ToSlash(filepath.Join(outputDir, "bashrc")) + `"`,
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1546,7 +1544,6 @@ imports:
 	}
 	for _, fragment := range []string{
 		"Linked files:",
-		"unchanged " + filepath.Join(home, ".bashenv"),
 		"unchanged " + filepath.Join(home, ".bashrc"),
 	} {
 		if !strings.Contains(stdout.String(), fragment) {
@@ -1589,8 +1586,9 @@ imports:
 	}
 
 	outputDir := expectedRunOutputDir(t, home, appData)
-	assertFileContains(t, filepath.Join(home, ".bashenv"), `source "`+filepath.Join(outputDir, "bashenv")+`"`)
-	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.Join(outputDir, "bashrc")+`"`)
+	assertFileMissing(t, filepath.Join(home, ".bashenv"))
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashenv"))+`"`)
+	assertFileContains(t, filepath.Join(home, ".bashrc"), `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashrc"))+`"`)
 	if strings.Contains(stdout.String(), "Apply changes") {
 		t.Fatalf("stdout unexpectedly prompted: %q", stdout.String())
 	}

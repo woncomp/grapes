@@ -31,7 +31,7 @@ When linking is enabled, `grapes` adds a managed marker block to the shell's nat
 
 | Shell | Generated files | Link target(s) |
 | --- | --- | --- |
-| Bash | `bashenv`, `bashrc` | `bashenv` is sourced from `~/.bash_profile` if that file already exists, otherwise from `~/.bashenv`; `bashrc` is sourced from `~/.bashrc` |
+| Bash | `bashenv`, `bashrc` | Both `bashenv` and `bashrc` are sourced from `~/.bashrc` |
 | Zsh | `zshenv`, `zshrc` | `zshenv` is sourced from `~/.zshenv`; `zshrc` is sourced from `~/.zshrc` |
 | PowerShell (`powershell`, `pwsh`) | `powershell-env.ps1`, `powershell-profile.ps1` | Both files are dot-sourced from a single profile: on Unix-like systems `~/.config/powershell/Microsoft.PowerShell_profile.ps1`; on Windows `~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1` |
 | Nushell (`nushell`, `nu`) | `nushell-env.nu`, `nushell-config.nu` | `nushell-env.nu` is `source-env`'d from `~/.config/nushell/env.nu` on Unix-like systems or `%APPDATA%\nushell\env.nu` on Windows; `nushell-config.nu` is sourced from `~/.config/nushell/config.nu` on Unix-like systems or `%APPDATA%\nushell\config.nu` on Windows |

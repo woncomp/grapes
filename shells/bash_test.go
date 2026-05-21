@@ -1,7 +1,6 @@
 package shells
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -22,13 +21,9 @@ func TestBashManagedFilename(t *testing.T) {
 	}
 }
 
-func TestBashLinkTargetsPreferBashProfile(t *testing.T) {
+func TestBashLinkTargetsUseBashrc(t *testing.T) {
 	home := t.TempDir()
 	outputDir := filepath.Join(home, ".config", "grapes")
-	profile := filepath.Join(home, ".bash_profile")
-	if err := os.WriteFile(profile, []byte(""), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
 	shell, err := Parse("bash")
 	if err != nil {
@@ -47,14 +42,17 @@ func TestBashLinkTargetsPreferBashProfile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := links[0].RCFile, profile; got != want {
+	if got, want := len(links), 1; got != want {
+		t.Fatalf("len(links) = %d, want %d", got, want)
+	}
+	if got, want := links[0].RCFile, filepath.Join(home, ".bashrc"); got != want {
 		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[0], `source "`+filepath.Join(outputDir, "bashenv")+`"`; got != want {
+	if got, want := links[0].InstallLines[0], `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashenv"))+`"`; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
-	if got, want := links[1].InstallLines[0], `source "`+filepath.Join(outputDir, "bashrc")+`"`; got != want {
-		t.Fatalf("links[1].InstallLines[0] = %q, want %q", got, want)
+	if got, want := links[0].InstallLines[1], `source "`+filepath.ToSlash(filepath.Join(outputDir, "bashrc"))+`"`; got != want {
+		t.Fatalf("links[0].InstallLines[1] = %q, want %q", got, want)
 	}
 }
 
@@ -78,10 +76,16 @@ func TestBashLinkTargetsUsePOSIXInstallLines(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if got, want := len(links), 1; got != want {
+		t.Fatalf("len(links) = %d, want %d", got, want)
+	}
+	if got, want := links[0].RCFile, `C:\Users\grapes\.bashrc`; got != want {
+		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
+	}
 	if got, want := links[0].InstallLines[0], `source "C:/Users/grapes/.config/grapes/bashenv"`; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
-	if got, want := links[1].InstallLines[0], `source "C:/Users/grapes/.config/grapes/bashrc"`; got != want {
-		t.Fatalf("links[1].InstallLines[0] = %q, want %q", got, want)
+	if got, want := links[0].InstallLines[1], `source "C:/Users/grapes/.config/grapes/bashrc"`; got != want {
+		t.Fatalf("links[0].InstallLines[1] = %q, want %q", got, want)
 	}
 }

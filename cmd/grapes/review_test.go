@@ -12,8 +12,7 @@ func TestReviewShellDisplaysGroupedDiffsWithoutColor(t *testing.T) {
 	plan := shellLinkPlan{
 		shell: mustParseShell(t, "bash"),
 		links: []reviewedLink{
-			{review: shells.Review{RCFile: "/tmp/.bashenv", Current: "", Proposed: "# >>> grapes >>>\nsource \"/tmp/bashenv\"\n# <<< grapes <<<\n", Changed: true}},
-			{review: shells.Review{RCFile: "/tmp/.bashrc", Current: "", Proposed: "# >>> grapes >>>\nsource \"/tmp/bashrc\"\n# <<< grapes <<<\n", Changed: true}},
+			{review: shells.Review{RCFile: "/tmp/.bashrc", Current: "", Proposed: "# >>> grapes >>>\nsource \"/tmp/bashenv\"\nsource \"/tmp/bashrc\"\n# <<< grapes <<<\n", Changed: true}},
 		},
 	}
 
@@ -33,7 +32,7 @@ func TestReviewShellDisplaysGroupedDiffsWithoutColor(t *testing.T) {
 	}
 
 	text := out.String()
-	for _, fragment := range []string{"Reviewing bash", "/tmp/.bashenv", "/tmp/.bashrc", "Apply changes for bash? [y/N]:"} {
+	for _, fragment := range []string{"Reviewing bash", "/tmp/.bashrc", "Apply changes for bash? [y/N]:"} {
 		if !strings.Contains(text, fragment) {
 			t.Fatalf("output = %q, want fragment %q", text, fragment)
 		}
