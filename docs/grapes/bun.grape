@@ -6,18 +6,18 @@ depend_executable:
     - --version
   version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
 ---
-#ifdef BASH
-export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-export PATH="$BUN_INSTALL/bin:$PATH"
-#elif ZSH
-export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-export PATH="$BUN_INSTALL/bin:$PATH"
-#elif NUSHELL
-$env.BUN_INSTALL = ($env.BUN_INSTALL? | default ($env.HOME | path join ".bun"))
-$env.PATH = ($env.PATH | prepend ($env.BUN_INSTALL | path join "bin"))
-#elif PWSH
+#ifdef PWSH
 if (-not $env:BUN_INSTALL) {
   $env:BUN_INSTALL = Join-Path $HOME ".bun"
 }
 $env:PATH = (Join-Path $env:BUN_INSTALL "bin") + [System.IO.Path]::PathSeparator + $env:PATH
+#elif NUSHELL
+$env.BUN_INSTALL = ($env.BUN_INSTALL? | default ($env.HOME | path join ".bun"))
+$env.PATH = ($env.PATH | prepend ($env.BUN_INSTALL | path join "bin"))
+#elif ZSH
+export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+export PATH="$BUN_INSTALL/bin:$PATH"
+#elif BASH
+export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+export PATH="$BUN_INSTALL/bin:$PATH"
 #endif
