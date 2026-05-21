@@ -288,6 +288,16 @@ echo prompt
 	assertFileMissing(t, filepath.Join(outputDir, "bashrc"))
 	assertFileMissing(t, filepath.Join(home, ".zshenv"))
 	assertFileMissing(t, filepath.Join(home, ".zshrc"))
+
+	envContent := mustReadFile(t, filepath.Join(outputDir, "zshenv"))
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "zshrc"))
+	if !strings.Contains(envContent, "# ==== grape: prompt") {
+		t.Fatalf("zshenv missing grape divider: %q", envContent)
+	}
+	if !strings.Contains(mainContent, "# ==== grape: prompt") {
+		t.Fatalf("zshrc missing grape divider: %q", mainContent)
+	}
+	assertFileExcludes(t, envContent, "# ==== grape: __GRAPE_ENV")
 }
 
 func TestRunNoLinkPreservesPreviouslyGeneratedOtherShellOutputs(t *testing.T) {

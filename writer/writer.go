@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Fragment is a preprocessed fragment ready for output.
@@ -30,7 +31,7 @@ func Write(targetDir string, outputs []OutputFile) error {
 
 		var content string
 		for _, f := range out.Fragments {
-			content += f.Content
+			content += renderFragment(f)
 		}
 
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
@@ -39,4 +40,12 @@ func Write(targetDir string, outputs []OutputFile) error {
 	}
 
 	return nil
+}
+
+func renderFragment(fragment Fragment) string {
+	if strings.TrimSpace(fragment.Name) == "" || strings.HasPrefix(fragment.Name, "__") {
+		return fragment.Content
+	}
+
+	return fmt.Sprintf("\n# =============================================\n# ==== grape: %s\n\n%s", fragment.Name, fragment.Content)
 }

@@ -33,6 +33,9 @@ func TestWriteBasic(t *testing.T) {
 	if !strings.Contains(string(data), "export PATH=/bin") {
 		t.Errorf("bashenv missing path content: %q", string(data))
 	}
+	if !strings.Contains(string(data), "# ==== grape: path") {
+		t.Errorf("bashenv missing fragment divider: %q", string(data))
+	}
 
 	data, err = os.ReadFile(filepath.Join(dir, "bashrc"))
 	if err != nil {
@@ -40,6 +43,9 @@ func TestWriteBasic(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "PS1=") {
 		t.Errorf("bashrc missing prompt content: %q", string(data))
+	}
+	if !strings.Contains(string(data), "# ==== grape: prompt") {
+		t.Errorf("bashrc missing fragment divider: %q", string(data))
 	}
 
 	data, err = os.ReadFile(filepath.Join(dir, "zshenv"))
@@ -94,6 +100,37 @@ func TestWriteEmptyPhase(t *testing.T) {
 	}
 	if len(data) != 0 {
 		t.Errorf("bashenv should be empty, got %q", string(data))
+	}
+}
+
+func TestWriteSkipsDividerForInternalFragments(t *testing.T) {
+	dir := t.TempDir()
+
+	outputs := []OutputFile{
+		{
+			Filename: "bashenv",
+			Fragments: []Fragment{
+				{Name: "__GRAPE_ENV", Content: "export GRAPES=1\n"},
+				{Name: "fnm", Content: "eval \"$(fnm env --use-on-cd)\"\n"},
+			},
+		},
+	}
+
+	if err := Write(dir, outputs); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "bashenv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	if !strings.HasPrefix(got, "export GRAPES=1\n\n# =============================================\n# ==== grape: fnm\n\n") {
+		t.Fatalf("bashenv formatting mismatch: %q", got)
+	}
+	if strings.Contains(got, "# ==== grape: __GRAPE_ENV") {
+		t.Fatalf("internal fragment unexpectedly rendered divider: %q", got)
 	}
 }
 
