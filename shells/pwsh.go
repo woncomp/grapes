@@ -2,7 +2,6 @@ package shells
 
 import (
 	"fmt"
-	"path/filepath"
 )
 
 type pwshShell struct{}
@@ -32,7 +31,7 @@ func (p pwshShell) LinkTargets(ctx TargetContext) ([]LinkTarget, error) {
 		return nil, err
 	}
 
-	profile := filepath.Join(home, ".config", "powershell", "Microsoft.PowerShell_profile.ps1")
+	profile := posixPath(targetPath(ctx.GOOS, home, ".config", "powershell", "Microsoft.PowerShell_profile.ps1"))
 	if ctx.GOOS == "windows" {
 		profile = targetPath(ctx.GOOS, home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
 	}

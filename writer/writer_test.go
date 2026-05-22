@@ -169,12 +169,18 @@ func TestWriteAddsCleanupDividerForCleanupFragment(t *testing.T) {
 }
 
 func TestWriteMkdirAllError(t *testing.T) {
+	dir := t.TempDir()
+	blocked := filepath.Join(dir, "blocked")
+	if err := os.WriteFile(blocked, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	outputs := []OutputFile{
 		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
 	}
-	err := Write("linux", "/dev/null/subdir", outputs)
+	err := Write("linux", filepath.Join(blocked, "subdir"), outputs)
 	if err == nil {
-		t.Error("expected error for MkdirAll on /dev/null/subdir")
+		t.Error("expected error for MkdirAll on blocked path")
 	}
 }
 
