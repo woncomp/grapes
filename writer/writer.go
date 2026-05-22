@@ -21,7 +21,7 @@ type OutputFile struct {
 
 // Write generates output files in the target directory.
 // Creates the directory if it doesn't exist.
-func Write(targetDir string, outputs []OutputFile) error {
+func Write(goos string, targetDir string, outputs []OutputFile) error {
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return fmt.Errorf("creating output directory %s: %w", targetDir, err)
 	}
@@ -33,6 +33,7 @@ func Write(targetDir string, outputs []OutputFile) error {
 		for _, f := range out.Fragments {
 			content += renderFragment(f)
 		}
+		content = normalizeLineEndings(goos, content)
 
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("writing %s: %w", path, err)
@@ -52,4 +53,13 @@ func renderFragment(fragment Fragment) string {
 	}
 
 	return fmt.Sprintf("\n# =============================================\n# ==== grape: %s\n\n%s", name, fragment.Content)
+}
+
+func normalizeLineEndings(goos string, content string) string {
+	if goos == "windows" {
+		return content
+	}
+
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	return strings.ReplaceAll(content, "\r", "\n")
 }

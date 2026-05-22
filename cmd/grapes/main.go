@@ -505,7 +505,7 @@ func runWithOptions(opts runOptions) error {
 		}
 	}
 
-	if err := writer.Write(outputDir, outputs); err != nil {
+	if err := writer.Write(opts.goos, outputDir, outputs); err != nil {
 		return err
 	}
 	for _, setupOutput := range setupOutputs {
