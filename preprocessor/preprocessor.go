@@ -117,11 +117,11 @@ func PathCleanInjectionLine(shell string, execPath string) (string, error) {
 	switch strings.ToLower(shell) {
 	case "bash", "zsh":
 		formattedPath := strings.ReplaceAll(execPath, `\`, "/")
-		return fmt.Sprintf(`export PATH="$(%s --path-clean "$PATH")"`, renderer.QuoteValue(shell, formattedPath)), nil
+		return fmt.Sprintf(`if __grapes_path_cleaned="$(%s --path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`, renderer.QuoteValue(shell, formattedPath)), nil
 	case "nushell":
-		return fmt.Sprintf(`$env.PATH = (^%s --path-clean ($env.PATH | str join (char esep)) | split row (char esep))`, renderer.QuoteValue(shell, execPath)), nil
+		return fmt.Sprintf(`let __grapes_path_cleaned = (^%s --path-clean ($env.PATH | str join (char esep)) | complete); if $__grapes_path_cleaned.exit_code == 0 { $env.PATH = ($__grapes_path_cleaned.stdout | split row (char nl) | get 0 | split row (char esep)) }`, renderer.QuoteValue(shell, execPath)), nil
 	case "pwsh":
-		return fmt.Sprintf(`$env:PATH = & %s --path-clean $env:PATH`, renderer.QuoteValue(shell, execPath)), nil
+		return fmt.Sprintf(`$__grapes_path_cleaned = & %s --path-clean $env:PATH; if ($? -and $LASTEXITCODE -eq 0) { $env:PATH = $__grapes_path_cleaned }; Remove-Variable __grapes_path_cleaned -ErrorAction SilentlyContinue`, renderer.QuoteValue(shell, execPath)), nil
 	default:
 		return "", fmt.Errorf("unsupported shell %q", shell)
 	}

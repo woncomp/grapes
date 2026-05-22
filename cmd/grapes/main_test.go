@@ -621,7 +621,9 @@ echo prompt
 	assertLineContainsFragments(t, content, "$env.GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("nushell", outputDir))
 	assertLineContainsFragments(t, content, "$env.PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env.PATH = ", "prepend", "/tool/bin")
-	assertLineContainsFragments(t, content, "^'", "--path-clean", "str join", "split row")
+	assertFileContains(t, filepath.Join(outputDir, "nushell-env.nu"), `let __grapes_path_cleaned = (^'`)
+	assertFileContains(t, filepath.Join(outputDir, "nushell-env.nu"), `--path-clean ($env.PATH | str join (char esep)) | complete`)
+	assertFileContains(t, filepath.Join(outputDir, "nushell-env.nu"), `if $__grapes_path_cleaned.exit_code == 0 { $env.PATH = ($__grapes_path_cleaned.stdout | split row (char nl) | get 0 | split row (char esep)) }`)
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
 	assertLineExcludesFragments(t, content, "GRAPES_SHELL", "export ")
@@ -682,7 +684,9 @@ echo prompt
 	assertLineContainsFragments(t, content, "$env:GRAPES_OUT_CACHE_DIR = ", "cache")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
-	assertLineContainsFragments(t, content, "$env:PATH = & ", "--path-clean", "$env:PATH")
+	assertFileContains(t, filepath.Join(outputDir, "pwsh-env.ps1"), `$__grapes_path_cleaned = & `)
+	assertFileContains(t, filepath.Join(outputDir, "pwsh-env.ps1"), `--path-clean $env:PATH; if ($? -and $LASTEXITCODE -eq 0) { $env:PATH = $__grapes_path_cleaned }`)
+	assertFileContains(t, filepath.Join(outputDir, "pwsh-env.ps1"), `Remove-Variable __grapes_path_cleaned -ErrorAction SilentlyContinue`)
 	assertLineExcludesFragments(t, content, "PROMPT_ENV", "export ")
 	assertLineExcludesFragments(t, content, "PATH", "export ")
 	assertLineExcludesFragments(t, content, "GRAPES_SHELL", "export ")
@@ -821,8 +825,10 @@ echo prompt
 	if strings.Contains(mainContent, "GRAPES_OUTPUT_PATH") {
 		t.Fatalf("zshrc unexpectedly contained GRAPES_OUTPUT_PATH: %q", mainContent)
 	}
-	assertLineContainsFragments(t, envContent, `export PATH="$("`, "--path-clean", `"$PATH")"`)
-	assertLineContainsFragments(t, mainContent, `export PATH="$("`, "--path-clean", `"$PATH")"`)
+	assertFileContains(t, filepath.Join(outputDir, "zshenv"), `if __grapes_path_cleaned="$("`)
+	assertFileContains(t, filepath.Join(outputDir, "zshenv"), `--path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`)
+	assertFileContains(t, filepath.Join(outputDir, "zshrc"), `if __grapes_path_cleaned="$("`)
+	assertFileContains(t, filepath.Join(outputDir, "zshrc"), `--path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`)
 }
 
 func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForNushell(t *testing.T) {
@@ -1108,7 +1114,8 @@ echo prompt-fragment
 	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION"), 2; got != want {
 		t.Fatalf("cleanup count = %d, want %d; content=%q", got, want, content)
 	}
-	assertLineContainsFragments(t, content, `export PATH="$("`, "--path-clean", `"$PATH")"`)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `if __grapes_path_cleaned="$("`)
+	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `--path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`)
 	if !strings.HasSuffix(content, expectedPathCleanLine("bash")) {
 		t.Fatalf("bashrc did not end with path clean tail: %q", content)
 	}
@@ -2020,11 +2027,11 @@ func expectedInjectedPath(shellName string, path string) string {
 func expectedPathCleanLine(shellName string) string {
 	switch shellName {
 	case "bash", "zsh":
-		return "\" --path-clean \"$PATH\")\"\n"
+		return "unset __grapes_path_cleaned\n"
 	case "nushell":
-		return "split row (char esep))\n"
+		return "split row (char esep)) }\n"
 	case "pwsh":
-		return "--path-clean $env:PATH\n"
+		return "Remove-Variable __grapes_path_cleaned -ErrorAction SilentlyContinue\n"
 	default:
 		return ""
 	}

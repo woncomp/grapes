@@ -150,22 +150,22 @@ func TestPathCleanInjectionLine(t *testing.T) {
 		{
 			shell:    "bash",
 			execPath: `C:\tools\grapes.exe`,
-			want:     `export PATH="$("C:/tools/grapes.exe" --path-clean "$PATH")"`,
+			want:     `if __grapes_path_cleaned="$("C:/tools/grapes.exe" --path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`,
 		},
 		{
 			shell:    "zsh",
 			execPath: `/opt/grapes`,
-			want:     `export PATH="$("/opt/grapes" --path-clean "$PATH")"`,
+			want:     `if __grapes_path_cleaned="$("/opt/grapes" --path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`,
 		},
 		{
 			shell:    "nushell",
 			execPath: `/opt/grapes`,
-			want:     `$env.PATH = (^'/opt/grapes' --path-clean ($env.PATH | str join (char esep)) | split row (char esep))`,
+			want:     `let __grapes_path_cleaned = (^'/opt/grapes' --path-clean ($env.PATH | str join (char esep)) | complete); if $__grapes_path_cleaned.exit_code == 0 { $env.PATH = ($__grapes_path_cleaned.stdout | split row (char nl) | get 0 | split row (char esep)) }`,
 		},
 		{
 			shell:    "pwsh",
 			execPath: `C:\tools\grapes.exe`,
-			want:     `$env:PATH = & 'C:\tools\grapes.exe' --path-clean $env:PATH`,
+			want:     `$__grapes_path_cleaned = & 'C:\tools\grapes.exe' --path-clean $env:PATH; if ($? -and $LASTEXITCODE -eq 0) { $env:PATH = $__grapes_path_cleaned }; Remove-Variable __grapes_path_cleaned -ErrorAction SilentlyContinue`,
 		},
 	}
 

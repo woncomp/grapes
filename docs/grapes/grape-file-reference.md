@@ -203,7 +203,7 @@ Generated `env` outputs inject:
 
 During generation, the `grapes` executable creates both `GRAPES_OUT_CACHE_DIR` and `~/.local/state/grapes` before writing managed outputs. Generated shell files no longer emit mkdir logic for those directories.
 
-Generated `env` and `main` outputs also end with a shell-native self-call to `grapes --path-clean`, so PATH is de-duplicated after all fragment logic has run.
+Generated `env` and `main` outputs also end with a shell-native self-call to `grapes --path-clean`, so PATH is de-duplicated after all fragment logic has run. The generated guard only updates `PATH` when that self-call succeeds; on failure, the existing `PATH` value is left unchanged.
 
 Executable-gated fragment scopes also inject:
 
