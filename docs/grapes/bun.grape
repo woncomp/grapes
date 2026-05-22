@@ -14,7 +14,6 @@ if (-not $env:BUN_INSTALL) {
 }
 $env:PATH = (Join-Path $env:BUN_INSTALL "bin") + [System.IO.Path]::PathSeparator + $env:PATH
 --#elif NUSHELL
-$env.BUN_INSTALL = ($env.BUN_INSTALL? | default ($env.HOME | path join ".bun"))
 $env.PATH = ($env.PATH | prepend ($env.BUN_INSTALL | path join "bin"))
 --#else
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
