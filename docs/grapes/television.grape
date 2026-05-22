@@ -1,0 +1,43 @@
+---
+phase: main
+depend_executable:
+  binary: tv
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+
+
+--#ifdef PWSH
+. ~/.local/state/grapes/cache/television.ps1
+--#elif NUSHELL
+source ~/.local/state/grapes/cache/television.nu
+--#else
+eval "$(tv init $GRAPES_SHELL)"
+--#endif
+
+---
+phase: setup
+---
+
+
+--#ifdef PWSH
+tv init power-shell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/cache/television.ps1
+--#elif NUSHELL
+tv init nu | save -f ~/.local/state/grapes/cache/television.nu
+--#else
+
+--#endif
+
+
+---
+phase: env
+---
+
+--#ifdef PWSH
+$env:TELEVISION_CONFIG = "$env:GRAPES_HOME/config/television"
+--#elif NUSHELL
+$env.TELEVISION_CONFIG = ($env.GRAPES_HOME | path join "config/television")
+--#else
+export TELEVISION_CONFIG=$GRAPES_HOME/config/television
+--#endif

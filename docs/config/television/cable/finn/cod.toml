@@ -1,0 +1,7 @@
+[metadata]
+name = "cod"
+description = ""
+requirements = ["fd"]
+
+[source]
+command = ["fd -a -E docs/ -E code/external/ -E game/soundloc/ -E game/sound/ -E game/map_source/ -E game/assets/ -E game/music_source/ -E game/share/raw/ddl/ -E game/bin/techart/external/ -E localizedstrings/ -E site-packages/", "fd -a . code/external/", "fd -a . game/assets/", "fd -a . game/map_source/"]
