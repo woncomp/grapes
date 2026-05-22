@@ -90,39 +90,39 @@ def faz [] {
 }
 --#elif ZSH
 ensure_favorites_file() {
-    local base path dir
+    local base query_path dir
     base=${LOCALAPPDATA:-$HOME/.local/share}
-    path="$base/nushell/favorites.txt"
-    dir=${path:h}
+    query_path="$base/nushell/favorites.txt"
+    dir=${query_path:h}
 
     if [[ ! -d $dir ]]; then
         /usr/bin/mkdir -p -- "$dir"
     fi
 
-    if [[ ! -e $path ]]; then
-        : > "$path"
+    if [[ ! -e $query_path ]]; then
+        : > "$query_path"
     fi
 
-    print -r -- "$path"
+    print -r -- "$query_path"
 }
 
 
 fav() {
-    local path value
-    path="$(ensure_favorites_file)"
+    local query_path value
+    query_path="$(ensure_favorites_file)"
     value="$*"
 
     if [[ $value == *$'\n' ]]; then
-        print -rn -- "$value" >> "$path"
+        print -rn -- "$value" >> "$query_path"
     else
-        print -r -- "$value" >> "$path"
+        print -r -- "$value" >> "$query_path"
     fi
 }
 
 faz() {
-    local path selection
-    path="$(ensure_favorites_file)"
-    selection="$(fzf < "$path")"
+    local query_path selection
+    query_path="$(ensure_favorites_file)"
+    selection="$(fzf < "$query_path")"
 
     if [[ -n $selection ]]; then
         if (( $+commands[pbcopy] )); then
