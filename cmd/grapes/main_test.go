@@ -55,6 +55,45 @@ func TestParseArgsSupportsPathCleanMode(t *testing.T) {
 	}
 }
 
+func TestParseArgsSupportsVersionMode(t *testing.T) {
+	opts, err := parseArgs([]string{"--version"}, func(string) (string, bool) {
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !opts.versionMode {
+		t.Fatal("versionMode = false, want true")
+	}
+	if opts.masterPath != "" {
+		t.Fatalf("masterPath = %q, want empty", opts.masterPath)
+	}
+}
+
+func TestParseArgsRejectsVersionWithOtherArguments(t *testing.T) {
+	tests := [][]string{
+		{"--version", "master.toml"},
+		{"master.toml", "--version"},
+		{"--version", "-t", "zsh"},
+		{"--version", "--path-clean", "/bin"},
+		{"--version", "--yes"},
+		{"--version", "--nolink"},
+		{"--version", "--dependency-mode=fail"},
+	}
+
+	for _, args := range tests {
+		_, err := parseArgs(args, func(string) (string, bool) {
+			return "", false
+		})
+		if err == nil {
+			t.Fatalf("expected error for args %v, got nil", args)
+		}
+		if !strings.Contains(err.Error(), "--version cannot be combined with other arguments") {
+			t.Fatalf("unexpected error for args %v: %v", args, err)
+		}
+	}
+}
+
 func TestParseArgsRejectsPathCleanWithoutValue(t *testing.T) {
 	_, err := parseArgs([]string{"--path-clean"}, func(string) (string, bool) {
 		return "", false
@@ -270,14 +309,35 @@ func TestPrintUsageUsesNewCommandShape(t *testing.T) {
 	if !strings.Contains(usage, "grapes --path-clean <path>") {
 		t.Fatalf("usage did not document path clean mode: %s", usage)
 	}
+	if !strings.Contains(usage, "grapes --version") {
+		t.Fatalf("usage did not document version mode: %s", usage)
+	}
 	if !strings.Contains(usage, "--dependency-mode") {
 		t.Fatalf("usage did not document --dependency-mode: %s", usage)
+	}
+	if !strings.Contains(usage, "--version") {
+		t.Fatalf("usage did not document --version: %s", usage)
 	}
 	if !strings.Contains(usage, "-y, --yes") {
 		t.Fatalf("usage did not document --yes: %s", usage)
 	}
 	if strings.Contains(usage, "--lazy") {
 		t.Fatalf("usage should not mention --lazy: %s", usage)
+	}
+}
+
+func TestPrintVersion(t *testing.T) {
+	oldVersion := version
+	version = "1.2.3"
+	t.Cleanup(func() {
+		version = oldVersion
+	})
+
+	var buf bytes.Buffer
+	printVersion(&buf)
+
+	if got, want := buf.String(), "grapes 1.2.3\n"; got != want {
+		t.Fatalf("printVersion() = %q, want %q", got, want)
 	}
 }
 

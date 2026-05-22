@@ -22,6 +22,7 @@ var (
 	errHelpRequested    = errors.New("help requested")
 	outputPhases        = []string{shells.PhaseEnv, shells.PhaseMain, shells.PhaseSetup}
 	defaultExecuteSetup = executeManagedSetup
+	version             = "dev"
 )
 
 type dependencyMode string
@@ -41,6 +42,7 @@ type cliOptions struct {
 	noLink         bool
 	pathClean      string
 	pathCleanMode  bool
+	versionMode    bool
 }
 
 type runOptions struct {
@@ -74,6 +76,11 @@ func main() {
 		printUsage(os.Stderr)
 		fmt.Fprintf(os.Stderr, "\nerror: %v\n", err)
 		os.Exit(1)
+	}
+
+	if opts.versionMode {
+		printVersion(os.Stdout)
+		return
 	}
 
 	if opts.pathCleanMode {
@@ -113,6 +120,8 @@ func parseArgsWithShellDetector(args []string, lookupEnv func(string) (string, b
 		switch {
 		case arg == "-h" || arg == "--help":
 			return cliOptions{}, errHelpRequested
+		case arg == "--version":
+			opts.versionMode = true
 		case arg == "--path-clean":
 			if i+1 >= len(args) {
 				return cliOptions{}, fmt.Errorf("missing value for %s", arg)
@@ -158,6 +167,13 @@ func parseArgsWithShellDetector(args []string, lookupEnv func(string) (string, b
 			}
 			opts.masterPath = arg
 		}
+	}
+
+	if opts.versionMode {
+		if opts.pathCleanMode || opts.masterPath != "" || len(opts.targets) > 0 || opts.assumeYes || opts.noLink || opts.dependencyMode != dependencyModePrompt {
+			return cliOptions{}, fmt.Errorf("--version cannot be combined with other arguments")
+		}
+		return opts, nil
 	}
 
 	if opts.pathCleanMode {
@@ -206,6 +222,7 @@ func addTarget(targets *[]shells.Shell, seen map[string]bool, raw string) error 
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: grapes <input> [-t shell]... [--dependency-mode mode] [--yes] [--nolink]")
 	fmt.Fprintln(w, "   or: grapes --path-clean <path>")
+	fmt.Fprintln(w, "   or: grapes --version")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Generate shell rc files from local .grape fragments.")
 	fmt.Fprintln(w)
@@ -215,7 +232,12 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "      --dependency-mode mode  Dependency handling mode: prompt, safe, allow-warnings, fail")
 	fmt.Fprintln(w, "  -y, --yes            Approve dependency review in safe mode and skip shell link prompts")
 	fmt.Fprintln(w, "      --nolink         Generate managed rc files only; do not link user rc files")
+	fmt.Fprintln(w, "      --version        Show version")
 	fmt.Fprintln(w, "  -h, --help           Show help")
+}
+
+func printVersion(w io.Writer) {
+	fmt.Fprintf(w, "grapes %s\n", version)
 }
 
 func managedOutputDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
