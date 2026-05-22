@@ -20,7 +20,7 @@ source ~/.local/state/grapes/zoxide.nu
 
 --#else
 
-. ~/.local/state/grapes/zoxide_$GRAPES_SHELL
+eval "$(zoxide init $GRAPES_SHELL)"
 
 --#endif
 
@@ -38,7 +38,5 @@ zoxide init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/
 zoxide init nushell | save -f ~/.local/state/grapes/zoxide.nu
 
 --#else
-
-zoxide init $GRAPES_SHELL > ~/.local/state/grapes/zoxide_$GRAPES_SHELL
 
 --#endif
