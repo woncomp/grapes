@@ -1,0 +1,15 @@
+[general]
+working_directory = "D:\\Downloads"
+
+[terminal]
+shell = "cmd"
+
+[window]
+opacity = 0.9
+
+dimensions = { columns = 400, lines = 80 }
+position = { x = 120, y = 80 }
+
+[font]
+normal = { family = "DejaVuSansM Nerd Font", style = "Regular" }
+size = 10
