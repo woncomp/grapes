@@ -2,22 +2,18 @@
 phase: env
 depend_executable:
   binary: go
+  search_paths:
+    - /usr/local/go/bin
   version_args:
     - version
   version_regex: "go([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
 ---
+
 --#ifdef PWSH
-if (-not $env:GOPATH) {
-  $env:GOPATH = Join-Path $HOME "go"
-}
-$env:PATH = (Join-Path $env:GOPATH "bin") + [System.IO.Path]::PathSeparator + $env:PATH
+
 --#elif NUSHELL
-$env.GOPATH = ($env.GOPATH? | default ($env.HOME | path join "go"))
-$env.PATH = ($env.PATH | prepend ($env.GOPATH | path join "bin"))
---#elif ZSH
-export GOPATH="${GOPATH:-$HOME/go}"
-export PATH="$GOPATH/bin:$PATH"
---#elif BASH
-export GOPATH="${GOPATH:-$HOME/go}"
+
+--#else
+export GOPATH="${GOPATH:-/usr/local/go}"
 export PATH="$GOPATH/bin:$PATH"
 --#endif
