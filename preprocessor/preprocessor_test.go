@@ -36,7 +36,7 @@ func TestShellInjection(t *testing.T) {
 	}
 }
 
-func TestOutputPathInjection(t *testing.T) {
+func TestOutputDirInjection(t *testing.T) {
 	tests := []struct {
 		shell      string
 		outputPath string
@@ -45,28 +45,28 @@ func TestOutputPathInjection(t *testing.T) {
 		{
 			shell:      "bash",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `export GRAPES_OUTPUT_PATH="C:/Users/me/AppData/Roaming/grapes"`,
+			want:       `export GRAPES_OUTPUT_DIR="C:/Users/me/AppData/Roaming/grapes"`,
 		},
 		{
 			shell:      "zsh",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `export GRAPES_OUTPUT_PATH="C:/Users/me/AppData/Roaming/grapes"`,
+			want:       `export GRAPES_OUTPUT_DIR="C:/Users/me/AppData/Roaming/grapes"`,
 		},
 		{
 			shell:      "nushell",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `$env.GRAPES_OUTPUT_PATH = 'C:\Users\me\AppData\Roaming\grapes'`,
+			want:       `$env.GRAPES_OUTPUT_DIR = 'C:\Users\me\AppData\Roaming\grapes'`,
 		},
 		{
 			shell:      "pwsh",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `$env:GRAPES_OUTPUT_PATH = 'C:\Users\me\AppData\Roaming\grapes'`,
+			want:       `$env:GRAPES_OUTPUT_DIR = 'C:\Users\me\AppData\Roaming\grapes'`,
 		},
 	}
 
 	for _, tt := range tests {
-		if got := OutputPathInjectionLine(tt.shell, tt.outputPath); got != tt.want {
-			t.Errorf("OutputPathInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
+		if got := OutputDirInjectionLine(tt.shell, tt.outputPath); got != tt.want {
+			t.Errorf("OutputDirInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
 		}
 	}
 }
@@ -106,7 +106,7 @@ func TestHomeInjection(t *testing.T) {
 	}
 }
 
-func TestOutputCacheDirInjection(t *testing.T) {
+func TestCacheDirInjection(t *testing.T) {
 	tests := []struct {
 		shell      string
 		outputPath string
@@ -115,28 +115,28 @@ func TestOutputCacheDirInjection(t *testing.T) {
 		{
 			shell:      "bash",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `export GRAPES_OUT_CACHE_DIR="C:/Users/me/AppData/Roaming/grapes/cache"`,
+			want:       `export GRAPES_CACHE_DIR="C:/Users/me/AppData/Roaming/grapes/cache"`,
 		},
 		{
 			shell:      "zsh",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `export GRAPES_OUT_CACHE_DIR="C:/Users/me/AppData/Roaming/grapes/cache"`,
+			want:       `export GRAPES_CACHE_DIR="C:/Users/me/AppData/Roaming/grapes/cache"`,
 		},
 		{
 			shell:      "nushell",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `$env.GRAPES_OUT_CACHE_DIR = ($env.GRAPES_OUTPUT_PATH | path join "cache")`,
+			want:       `$env.GRAPES_CACHE_DIR = ($env.GRAPES_OUTPUT_DIR | path join "cache")`,
 		},
 		{
 			shell:      "pwsh",
 			outputPath: `C:\Users\me\AppData\Roaming\grapes`,
-			want:       `$env:GRAPES_OUT_CACHE_DIR = Join-Path $env:GRAPES_OUTPUT_PATH "cache"`,
+			want:       `$env:GRAPES_CACHE_DIR = Join-Path $env:GRAPES_OUTPUT_DIR "cache"`,
 		},
 	}
 
 	for _, tt := range tests {
-		if got := OutputCacheDirInjectionLine(tt.shell, tt.outputPath); got != tt.want {
-			t.Errorf("OutputCacheDirInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
+		if got := CacheDirInjectionLine(tt.shell, tt.outputPath); got != tt.want {
+			t.Errorf("CacheDirInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
 		}
 	}
 }

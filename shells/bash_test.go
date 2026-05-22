@@ -23,7 +23,7 @@ func TestBashManagedFilename(t *testing.T) {
 
 func TestBashLinkTargetsUseBashrc(t *testing.T) {
 	home := t.TempDir()
-	outputDir := filepath.Join(home, ".config", "grapes")
+	outputDir := filepath.Join(home, ".local", "state", "grapes")
 
 	shell, err := Parse("bash")
 	if err != nil {
@@ -70,7 +70,7 @@ func TestBashLinkTargetsUsePOSIXInstallLines(t *testing.T) {
 			}
 			return "", false
 		},
-		OutputDir: `C:\Users\grapes\.config\grapes`,
+		OutputDir: `C:\Users\grapes\.local\state\grapes`,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -82,10 +82,10 @@ func TestBashLinkTargetsUsePOSIXInstallLines(t *testing.T) {
 	if got, want := links[0].RCFile, `C:\Users\grapes\.bashrc`; got != want {
 		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[0], `source "C:/Users/grapes/.config/grapes/bashenv"`; got != want {
+	if got, want := links[0].InstallLines[0], `source "C:/Users/grapes/.local/state/grapes/bashenv"`; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
-	if got, want := links[0].InstallLines[1], `source "C:/Users/grapes/.config/grapes/bashrc"`; got != want {
+	if got, want := links[0].InstallLines[1], `source "C:/Users/grapes/.local/state/grapes/bashrc"`; got != want {
 		t.Fatalf("links[0].InstallLines[1] = %q, want %q", got, want)
 	}
 }

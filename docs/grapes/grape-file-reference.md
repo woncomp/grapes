@@ -198,10 +198,10 @@ Generated `env` outputs inject:
 
 - `GRAPES_SHELL`: the canonical target shell name
 - `GRAPES_HOME`: the directory that contains the master `.toml` file
-- `GRAPES_OUTPUT_PATH`: the managed output directory that contains the generated files
-- `GRAPES_OUT_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_PATH`
+- `GRAPES_OUTPUT_DIR`: the managed output directory that contains the generated files
+- `GRAPES_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_DIR`
 
-During generation, the `grapes` executable creates both `GRAPES_OUT_CACHE_DIR` and `~/.local/state/grapes` before writing managed outputs. Generated shell files no longer emit mkdir logic for those directories.
+During generation, the `grapes` executable creates both `GRAPES_OUTPUT_DIR` and `GRAPES_CACHE_DIR` before writing managed outputs. Both resolve under `~/.local/state/grapes`, and generated shell files no longer emit mkdir logic for those directories.
 
 Generated `env` and `main` outputs also end with a shell-native self-call to `grapes --path-clean`, so PATH is de-duplicated after all fragment logic has run. The generated guard only updates `PATH` when that self-call succeeds; on failure, the existing `PATH` value is left unchanged.
 

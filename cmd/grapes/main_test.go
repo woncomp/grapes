@@ -307,22 +307,22 @@ func TestManagedOutputDirUnix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := dir, filepath.Join("/tmp/home", ".config", "grapes"); got != want {
+	if got, want := dir, filepath.Join("/tmp/home", ".local", "state", "grapes"); got != want {
 		t.Fatalf("managedOutputDir() = %q, want %q", got, want)
 	}
 }
 
-func TestManagedOutputDirWindowsUsesAppData(t *testing.T) {
+func TestManagedOutputDirWindowsUsesHome(t *testing.T) {
 	dir, err := managedOutputDir("windows", func(key string) (string, bool) {
-		if key == "APPDATA" {
-			return `C:\Users\me\AppData\Roaming`, true
+		if key == "USERPROFILE" {
+			return `C:\Users\me`, true
 		}
 		return "", false
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := dir, filepath.Join(`C:\Users\me\AppData\Roaming`, "grapes"); got != want {
+	if got, want := dir, filepath.Join(`C:\Users\me`, ".local", "state", "grapes"); got != want {
 		t.Fatalf("managedOutputDir() = %q, want %q", got, want)
 	}
 }
@@ -484,7 +484,7 @@ echo setup-fragment
 			if !strings.Contains(content, "echo setup-fragment") {
 				t.Fatalf("setup file missing setup fragment: %q", content)
 			}
-			if !strings.Contains(content, "GRAPES_OUTPUT_PATH") {
+			if !strings.Contains(content, "GRAPES_OUTPUT_DIR") {
 				t.Fatalf("setup file missing injected globals: %q", content)
 			}
 			if strings.Contains(content, "--path-clean") {
@@ -618,7 +618,7 @@ echo prompt
 	content := string(data)
 	assertLineContainsFragments(t, content, "$env.GRAPES_SHELL = ", "nushell")
 	assertLineContainsFragments(t, content, "$env.GRAPES_HOME = ", sourceDir)
-	assertLineContainsFragments(t, content, "$env.GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("nushell", outputDir))
+	assertLineContainsFragments(t, content, "$env.GRAPES_OUTPUT_DIR = ", expectedInjectedOutputPath("nushell", outputDir))
 	assertLineContainsFragments(t, content, "$env.PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env.PATH = ", "prepend", "/tool/bin")
 	assertFileContains(t, filepath.Join(outputDir, "nushell-env.nu"), `let __grapes_path_cleaned = (^'`)
@@ -680,8 +680,8 @@ echo prompt
 	content := string(data)
 	assertLineContainsFragments(t, content, "$env:GRAPES_SHELL = ", "pwsh")
 	assertLineContainsFragments(t, content, "$env:GRAPES_HOME = ", sourceDir)
-	assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ", expectedInjectedOutputPath("pwsh", outputDir))
-	assertLineContainsFragments(t, content, "$env:GRAPES_OUT_CACHE_DIR = ", "cache")
+	assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_DIR = ", expectedInjectedOutputPath("pwsh", outputDir))
+	assertLineContainsFragments(t, content, "$env:GRAPES_CACHE_DIR = ", "cache")
 	assertLineContainsFragments(t, content, "$env:PROMPT_ENV = ", "1")
 	assertLineContainsFragments(t, content, "$env:PATH = ", "/tool/bin", "$env:PATH")
 	assertFileContains(t, filepath.Join(outputDir, "pwsh-env.ps1"), `$__grapes_path_cleaned = & `)
@@ -812,18 +812,18 @@ echo prompt
 	if got, want := strings.Count(envContent, `GRAPES_HOME="`+expectedInjectedPath("zsh", sourceDir)+`"`), 1; got != want {
 		t.Fatalf("env GRAPES_HOME count = %d, want %d; content=%q", got, want, envContent)
 	}
-	if got, want := strings.Count(envContent, `GRAPES_OUTPUT_PATH="`+expectedInjectedOutputPath("zsh", outputDir)+`"`), 1; got != want {
-		t.Fatalf("env GRAPES_OUTPUT_PATH count = %d, want %d; content=%q", got, want, envContent)
+	if got, want := strings.Count(envContent, `GRAPES_OUTPUT_DIR="`+expectedInjectedOutputPath("zsh", outputDir)+`"`), 1; got != want {
+		t.Fatalf("env GRAPES_OUTPUT_DIR count = %d, want %d; content=%q", got, want, envContent)
 	}
-	if got, want := strings.Count(envContent, `GRAPES_OUT_CACHE_DIR="`+expectedInjectedOutputPath("zsh", outputDir)+`/cache"`), 1; got != want {
-		t.Fatalf("env GRAPES_OUT_CACHE_DIR count = %d, want %d; content=%q", got, want, envContent)
+	if got, want := strings.Count(envContent, `GRAPES_CACHE_DIR="`+expectedInjectedOutputPath("zsh", outputDir)+`/cache"`), 1; got != want {
+		t.Fatalf("env GRAPES_CACHE_DIR count = %d, want %d; content=%q", got, want, envContent)
 	}
 	mainContent := mustReadFile(t, filepath.Join(outputDir, "zshrc"))
 	if strings.Contains(mainContent, "GRAPES_SHELL") {
 		t.Fatalf("zshrc unexpectedly contained GRAPES_SHELL: %q", mainContent)
 	}
-	if strings.Contains(mainContent, "GRAPES_OUTPUT_PATH") {
-		t.Fatalf("zshrc unexpectedly contained GRAPES_OUTPUT_PATH: %q", mainContent)
+	if strings.Contains(mainContent, "GRAPES_OUTPUT_DIR") {
+		t.Fatalf("zshrc unexpectedly contained GRAPES_OUTPUT_DIR: %q", mainContent)
 	}
 	assertFileContains(t, filepath.Join(outputDir, "zshenv"), `if __grapes_path_cleaned="$("`)
 	assertFileContains(t, filepath.Join(outputDir, "zshenv"), `--path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`)
@@ -894,7 +894,7 @@ import = "fzf"
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
-	assertLineContainsFragments(t, envContent, "$env.GRAPES_OUT_CACHE_DIR = ", "path join", "cache")
+	assertLineContainsFragments(t, envContent, "$env.GRAPES_CACHE_DIR = ", "path join", "cache")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GRAPES_EXEC_DIR")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_PATH = ", "fnm")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_EXEC_VERSION = ", "1.39.0")
@@ -962,7 +962,7 @@ import = "fzf"
 		executeSetup: func(shell shells.Shell, path string) error {
 			executed = append(executed, shell.Name()+"|"+path)
 			content := mustReadFile(t, path)
-			assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_PATH = ")
+			assertLineContainsFragments(t, content, "$env:GRAPES_OUTPUT_DIR = ")
 			assertLineContainsFragments(t, content, "$env:GRAPES_EXEC_PATH = ", "zoxide")
 			assertLineContainsFragments(t, content, "init powershell", "Set-Content", "zoxide.ps1")
 			return nil
@@ -994,7 +994,7 @@ import = "fzf"
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
-	assertLineContainsFragments(t, envContent, "$env:GRAPES_OUT_CACHE_DIR = ", "Join-Path", "cache")
+	assertLineContainsFragments(t, envContent, "$env:GRAPES_CACHE_DIR = ", "Join-Path", "cache")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "GRAPES_EXEC_DIR")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_PATH = ", "fnm")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_EXEC_VERSION = ", "1.39.0")
@@ -1999,12 +1999,9 @@ import = "./tool.grape"
 func expectedRunOutputDir(t *testing.T, home, appData string) string {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		if appData == "" {
-			t.Fatal("APPDATA must be set for Windows run() tests")
-		}
-		return filepath.Join(appData, "grapes")
+		return filepath.Join(home, ".local", "state", "grapes")
 	}
-	return filepath.Join(home, ".config", "grapes")
+	return filepath.Join(home, ".local", "state", "grapes")
 }
 
 func expectedRunStateDir(home string) string {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.toml` file, Grapes loads the referenced `.grape` fragments, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.config/grapes/`, and optionally links the user's rc files back to those managed outputs.
+Grapes is a Go CLI that generates managed shell rc files from composable fragments. Users point the CLI at a master `.toml` file, Grapes loads the referenced `.grape` fragments, resolves dependencies, preprocesses shell-conditional content, writes managed files under `~/.local/state/grapes/`, and optionally links the user's rc files back to those managed outputs.
 
 The current implementation targets `bash` and `zsh`. A run can generate one or more selected shells and defaults to the current shell when no target is specified.
 
@@ -18,7 +18,7 @@ docs/grapes.toml
   -> master-relative fragment resolution
   -> resolver.Resolve
   -> preprocessor.Process per selected shell and block
-  -> writer.Write managed files into ~/.config/grapes/
+  -> writer.Write managed files into ~/.local/state/grapes/
   -> shells.Install link blocks unless --nolink
 ```
 
@@ -46,7 +46,7 @@ docs/grapes.toml
    - Injects generated Grapes environment variables into managed env output.
 
 5. **Writer (`writer`)**
-   - Writes selected output files into `~/.config/grapes/`.
+   - Writes selected output files into `~/.local/state/grapes/`.
    - Concatenates preprocessed fragment output in resolved order.
 
 6. **Shell integration (`shells`)**
@@ -92,7 +92,7 @@ Behavior:
 
 - `-t, --target` is repeatable.
 - When no target is provided, Grapes detects the current shell from `$SHELL`.
-- Managed outputs are always written to `~/.config/grapes/`.
+- Managed outputs are always written to `~/.local/state/grapes/`.
 - Link blocks are installed by default; `--nolink` skips rc file modification.
 - Managed outputs for supported shells that were not selected in the current run are pruned.
 
@@ -101,7 +101,7 @@ Behavior:
 For selected shells, Grapes writes:
 
 ```text
-~/.config/grapes/
+~/.local/state/grapes/
 ├── bashenv
 ├── bashrc
 ├── zshenv
@@ -119,7 +119,7 @@ Installed marker block:
 
 ```bash
 # >>> grapes >>>
-source "$HOME/.config/grapes/bashrc"
+source "$HOME/.local/state/grapes/bashrc"
 # <<< grapes <<<
 ```
 

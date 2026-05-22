@@ -219,19 +219,11 @@ func printUsage(w io.Writer) {
 }
 
 func managedOutputDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
-	if goos == "windows" {
-		appData, ok := lookupEnv("APPDATA")
-		if !ok || strings.TrimSpace(appData) == "" {
-			return "", fmt.Errorf("APPDATA environment variable not set")
-		}
-		return filepath.Join(appData, "grapes"), nil
+	home, err := userHomeDir(goos, lookupEnv)
+	if err != nil {
+		return "", err
 	}
-
-	home, ok := lookupEnv("HOME")
-	if !ok || strings.TrimSpace(home) == "" {
-		return "", fmt.Errorf("HOME environment variable not set")
-	}
-	return filepath.Join(home, ".config", "grapes"), nil
+	return filepath.Join(home, ".local", "state", "grapes"), nil
 }
 
 func userHomeDir(goos string, lookupEnv func(string) (string, bool)) (string, error) {
@@ -248,14 +240,9 @@ func userHomeDir(goos string, lookupEnv func(string) (string, bool)) (string, er
 }
 
 func ensureRuntimeDirs(goos string, lookupEnv func(string) (string, bool), outputDir string) error {
-	home, err := userHomeDir(goos, lookupEnv)
-	if err != nil {
-		return err
-	}
-
 	dirs := []string{
+		outputDir,
 		filepath.Join(outputDir, "cache"),
-		filepath.Join(home, ".local", "state", "grapes"),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o755); err != nil {

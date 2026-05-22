@@ -33,7 +33,7 @@ func TestPreviewReturnsCurrentAndProposedContent(t *testing.T) {
 func TestPreviewReportsNoChangeWhenInstallMatches(t *testing.T) {
 	dir := t.TempDir()
 	rcFile := filepath.Join(dir, ".bashrc")
-	lines := []string{`source "$HOME/.config/grapes/bashrc"`}
+	lines := []string{`source "$HOME/.local/state/grapes/bashrc"`}
 	if err := Install(rcFile, lines); err != nil {
 		t.Fatal(err)
 	}

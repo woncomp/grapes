@@ -62,15 +62,15 @@ func ShellInjectionLine(shell string) string {
 	}
 }
 
-func OutputPathInjectionLine(shell string, outputPath string) string {
+func OutputDirInjectionLine(shell string, outputPath string) string {
 	switch strings.ToLower(shell) {
 	case "bash", "zsh":
 		formattedPath := strings.ReplaceAll(outputPath, `\`, "/")
-		return fmt.Sprintf("export GRAPES_OUTPUT_PATH=%s", renderer.QuoteValue(shell, formattedPath))
+		return fmt.Sprintf("export GRAPES_OUTPUT_DIR=%s", renderer.QuoteValue(shell, formattedPath))
 	case "nushell":
-		return fmt.Sprintf("$env.GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, outputPath))
+		return fmt.Sprintf("$env.GRAPES_OUTPUT_DIR = %s", renderer.QuoteValue(shell, outputPath))
 	case "pwsh":
-		return fmt.Sprintf("$env:GRAPES_OUTPUT_PATH = %s", renderer.QuoteValue(shell, outputPath))
+		return fmt.Sprintf("$env:GRAPES_OUTPUT_DIR = %s", renderer.QuoteValue(shell, outputPath))
 	default:
 		panic(fmt.Sprintf("unsupported shell %q", shell))
 	}
@@ -90,15 +90,15 @@ func HomeInjectionLine(shell string, homePath string) string {
 	}
 }
 
-func OutputCacheDirInjectionLine(shell string, outputPath string) string {
+func CacheDirInjectionLine(shell string, outputPath string) string {
 	switch strings.ToLower(shell) {
 	case "bash", "zsh":
 		cacheDir := strings.ReplaceAll(filepath.Join(outputPath, "cache"), `\`, "/")
-		return fmt.Sprintf("export GRAPES_OUT_CACHE_DIR=%s", renderer.QuoteValue(shell, cacheDir))
+		return fmt.Sprintf("export GRAPES_CACHE_DIR=%s", renderer.QuoteValue(shell, cacheDir))
 	case "nushell":
-		return `$env.GRAPES_OUT_CACHE_DIR = ($env.GRAPES_OUTPUT_PATH | path join "cache")`
+		return `$env.GRAPES_CACHE_DIR = ($env.GRAPES_OUTPUT_DIR | path join "cache")`
 	case "pwsh":
-		return `$env:GRAPES_OUT_CACHE_DIR = Join-Path $env:GRAPES_OUTPUT_PATH "cache"`
+		return `$env:GRAPES_CACHE_DIR = Join-Path $env:GRAPES_OUTPUT_DIR "cache"`
 	default:
 		panic(fmt.Sprintf("unsupported shell %q", shell))
 	}
@@ -108,8 +108,8 @@ func InjectedEnvLines(shell string, outputPath string, homePath string) []string
 	return []string{
 		ShellInjectionLine(shell),
 		HomeInjectionLine(shell, homePath),
-		OutputPathInjectionLine(shell, outputPath),
-		OutputCacheDirInjectionLine(shell, outputPath),
+		OutputDirInjectionLine(shell, outputPath),
+		CacheDirInjectionLine(shell, outputPath),
 	}
 }
 

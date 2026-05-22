@@ -187,22 +187,22 @@ That preserves phase ordering while fitting naturally into pwsh's single-profile
 
 ## Managed Output Directory
 
-The current implementation writes managed files to `~/.config/grapes`. Supporting Windows-native shell integration cleanly requires making that location platform-aware.
+The current implementation writes managed files to `~/.local/state/grapes` across platforms.
 
 Managed output directory:
 
 - Unix-like systems:
-  - `~/.config/grapes`
+  - `~/.local/state/grapes`
 - Windows:
-  - `%APPDATA%\grapes`
+  - `~/.local/state/grapes`
 
-The CLI should use a shared managed-output resolver instead of hardcoding the current `HOME/.config/grapes` path.
+The CLI should use a shared managed-output resolver instead of hardcoding the managed output path.
 
 Home-like path resolution should also become explicit:
 
 - prefer `HOME` where appropriate
 - on Windows, allow `USERPROFILE` as the fallback home directory when `HOME` is absent
-- use `APPDATA` for Windows config-style locations
+- use the home directory for the managed output location
 
 This keeps the generated file paths consistent with the native profile locations that will reference them.
 
@@ -289,7 +289,7 @@ This feature does not broaden shell auto-detection into heuristic guessing for W
 With the new shells included, managed files in the Grapes output directory may now include:
 
 ```text
-~/.config/grapes/
+~/.local/state/grapes/
 ├── bashenv
 ├── bashrc
 ├── zshenv

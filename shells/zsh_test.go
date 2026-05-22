@@ -23,7 +23,7 @@ func TestZshManagedFilename(t *testing.T) {
 
 func TestZshLinkTargets(t *testing.T) {
 	home := t.TempDir()
-	outputDir := filepath.Join(home, ".config", "grapes")
+	outputDir := filepath.Join(home, ".local", "state", "grapes")
 
 	shell, err := Parse("zsh")
 	if err != nil {
@@ -48,7 +48,7 @@ func TestZshLinkTargets(t *testing.T) {
 	if got, want := links[0].RCFile, filepath.Join(home, ".zshenv"); got != want {
 		t.Fatalf("links[0].RCFile = %q, want %q", got, want)
 	}
-	if got, want := links[1].InstallLines[0], `source "`+filepath.Join(outputDir, "zshrc")+`"`; got != want {
+	if got, want := links[1].InstallLines[0], `source "`+filepath.ToSlash(filepath.Join(outputDir, "zshrc"))+`"`; got != want {
 		t.Fatalf("links[1].InstallLines[0] = %q, want %q", got, want)
 	}
 }
@@ -67,16 +67,16 @@ func TestZshLinkTargetsUsePOSIXInstallLines(t *testing.T) {
 			}
 			return "", false
 		},
-		OutputDir: `C:\Users\grapes\.config\grapes`,
+		OutputDir: `C:\Users\grapes\.local\state\grapes`,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if got, want := links[0].InstallLines[0], `source "C:/Users/grapes/.config/grapes/zshenv"`; got != want {
+	if got, want := links[0].InstallLines[0], `source "C:/Users/grapes/.local/state/grapes/zshenv"`; got != want {
 		t.Fatalf("links[0].InstallLines[0] = %q, want %q", got, want)
 	}
-	if got, want := links[1].InstallLines[0], `source "C:/Users/grapes/.config/grapes/zshrc"`; got != want {
+	if got, want := links[1].InstallLines[0], `source "C:/Users/grapes/.local/state/grapes/zshrc"`; got != want {
 		t.Fatalf("links[1].InstallLines[0] = %q, want %q", got, want)
 	}
 }
@@ -84,7 +84,7 @@ func TestZshLinkTargetsUsePOSIXInstallLines(t *testing.T) {
 func TestZshLinkTargetsRespectsZDOTDIRForZshrc(t *testing.T) {
 	home := t.TempDir()
 	zdotdir := filepath.Join(home, ".config", "zsh")
-	outputDir := filepath.Join(home, ".config", "grapes")
+	outputDir := filepath.Join(home, ".local", "state", "grapes")
 
 	shell, err := Parse("zsh")
 	if err != nil {

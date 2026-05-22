@@ -58,8 +58,8 @@ For `.grape` fragments and master `.toml` format, phases, frontmatter, dependenc
 
 Generated shell files are written to the managed output directory:
 
-- Unix-like systems: `~/.config/grapes`
-- Windows: `%APPDATA%\grapes`
+- Unix-like systems: `~/.local/state/grapes`
+- Windows: `~/.local/state/grapes`
 
 When linking is enabled, `grapes` adds a managed marker block to the shell's native startup file(s) so those generated files are sourced.
 
