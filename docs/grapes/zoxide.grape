@@ -20,7 +20,7 @@ source ~/.local/state/grapes/zoxide.nu
 
 --#else
 
-eval "$(zoxide init $GRAPES_SHELL)"
+eval "$($GRAPES_EXEC_PATH init $GRAPES_SHELL)"
 
 --#endif
 
