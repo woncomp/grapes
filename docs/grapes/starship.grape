@@ -12,15 +12,15 @@ depend_executable:
 
 --#ifdef PWSH
 
-. ~/.local/state/grapes/starship.ps1
+. ~/.local/state/grapes/cache/starship.ps1
 
 --#elif NUSHELL
 
-source ~/.local/state/grapes/starship.nu
+source ~/.local/state/grapes/cache/starship.nu
 
 --#else
 
-. ~/.local/state/grapes/starship_$GRAPES_SHELL
+. ~/.local/state/grapes/cache/starship_$GRAPES_SHELL
 
 --#endif
 
@@ -50,14 +50,14 @@ phase: setup
 
 --#ifdef PWSH
 
-starship init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/starship.ps1
+starship init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/cache/starship.ps1
 
 --#elif NUSHELL
 
-starship init nu | save -f ~/.local/state/grapes/starship.nu
+starship init nu | save -f ~/.local/state/grapes/cache/starship.nu
 
 --#else
 
-starship init $GRAPES_SHELL > ~/.local/state/grapes/starship_$GRAPES_SHELL
+starship init $GRAPES_SHELL > ~/.local/state/grapes/cache/starship_$GRAPES_SHELL
 
 --#endif

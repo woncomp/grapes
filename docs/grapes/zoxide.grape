@@ -12,11 +12,11 @@ depend_executable:
 
 --#ifdef PWSH
 
-. ~/.local/state/grapes/zoxide.ps1
+. ~/.local/state/grapes/cache/zoxide.ps1
 
 --#elif NUSHELL
 
-source ~/.local/state/grapes/zoxide.nu
+source ~/.local/state/grapes/cache/zoxide.nu
 
 --#else
 
@@ -31,11 +31,11 @@ phase: setup
 
 --#ifdef PWSH
 
-zoxide init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1
+zoxide init powershell | Set-Content -Encoding utf8 -Path ~/.local/state/grapes/cache/zoxide.ps1
 
 --#elif NUSHELL
 
-zoxide init nushell | save -f ~/.local/state/grapes/zoxide.nu
+zoxide init nushell | save -f ~/.local/state/grapes/cache/zoxide.nu
 
 --#else
 

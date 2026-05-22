@@ -1,3 +1,7 @@
+
+[[grape]]
+import = "grapes/finn/zsh-startup"
+
 [[grape]]
 import = "bun"
 from = "grapes"
@@ -16,6 +20,26 @@ from = "grapes"
 import = "starship"
 from = "grapes"
 
+[[grape]]
+import = "grapes/television"
+
+[[grape]]
+import = "grapes/finn/eza-ext"
+
+[[grape]]
+import = "grapes/finn/fav"
+
+[[grape]]
+import = "grapes/finn/fd-ext"
+
+[[grape]]
+import = "grapes/finn/isolde"
+
+[[grape]]
+import = "grapes/finn/nvim-ext"
+
+[[grape]]
+import = "grapes/finn/yazi-ext"
 
 # zoxide must be the last one
 [[grape]]

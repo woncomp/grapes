@@ -1,0 +1,64 @@
+---
+phase: main
+depend_executable:
+  binary: isr
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+
+
+--#ifdef PWSH
+
+function fcd {
+  $rest = @($args)
+  $arg0 = if ($rest.Count -gt 0) { $rest[0] } else { "~" }
+  if ($rest.Count -le 1 -and ($arg0 -eq "-" -or (Test-Path -LiteralPath $arg0 -PathType Container))) {
+    Set-Location -Path $arg0
+    return
+  }
+  $path = ((isr sub-dir @rest) | Out-String).TrimEnd("`r", "`n")
+  Set-Location -Path $path
+}
+
+function tp {
+  isr translate-path @args
+}
+
+--#elif NUSHELL
+
+def --env __isolde_fcd [...rest:string] {
+  let arg0 = ($rest | append '~').0
+  let path = if (($rest | length) <= 1) and ($arg0 == '-' or ($arg0 | path expand | path type) == dir) {
+    $arg0
+  } else {
+    (isr sub-dir ...$rest | str trim -r -c "\n")
+  }
+  cd $path
+}
+
+alias fcd = __isolde_fcd
+alias tp = isr translate-path
+
+--#elif ZSH
+
+fcd() {
+  local arg0 path
+  if (( $# > 0 )); then
+    arg0=$1
+  else
+    arg0=~
+  fi
+  if (( $# <= 1 )) && [[ $arg0 == "-" || -d $arg0 ]]; then
+    cd -- "$arg0"
+    return
+  fi
+  path="$(isr sub-dir "$@")"
+  cd -- "$path"
+}
+
+alias tp='isr translate-path'
+
+--#else
+
+--#endif

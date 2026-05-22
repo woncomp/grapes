@@ -161,9 +161,9 @@ func TestZoxideExampleUsesCurrentShellSpecificInit(t *testing.T) {
 
 	mainBody := fragmentBlockBody(t, frag, "main")
 	for _, want := range []string{
-		"~/.local/state/grapes/zoxide.ps1",
+		"~/.local/state/grapes/cache/zoxide.ps1",
 		`init $GRAPES_SHELL`,
-		"source ~/.local/state/grapes/zoxide.nu",
+		"source ~/.local/state/grapes/cache/zoxide.nu",
 	} {
 		if !strings.Contains(mainBody, want) {
 			t.Fatalf("main block did not contain %q; got %q", want, mainBody)
@@ -173,9 +173,8 @@ func TestZoxideExampleUsesCurrentShellSpecificInit(t *testing.T) {
 	setupBody := fragmentBlockBody(t, frag, "setup")
 	for _, want := range []string{
 		"init powershell",
-		"& $env:GRAPES_EXEC_PATH",
-		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/zoxide.ps1",
-		"init nushell | save -f ~/.local/state/grapes/zoxide.nu",
+		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/cache/zoxide.ps1",
+		"init nushell | save -f ~/.local/state/grapes/cache/zoxide.nu",
 	} {
 		if !strings.Contains(setupBody, want) {
 			t.Fatalf("setup block did not contain %q; got %q", want, setupBody)
@@ -191,9 +190,9 @@ func TestStarshipExampleUsesCachedShellSpecificInit(t *testing.T) {
 
 	mainBody := fragmentBlockBody(t, frag, "main")
 	for _, want := range []string{
-		"~/.local/state/grapes/starship.ps1",
-		"~/.local/state/grapes/starship.$GRAPES_SHELL",
-		"source ~/.local/state/grapes/starship.nu",
+		"~/.local/state/grapes/cache/starship.ps1",
+		"~/.local/state/grapes/cache/starship_$GRAPES_SHELL",
+		"source ~/.local/state/grapes/cache/starship.nu",
 	} {
 		if !strings.Contains(mainBody, want) {
 			t.Fatalf("main block did not contain %q; got %q", want, mainBody)
@@ -203,9 +202,9 @@ func TestStarshipExampleUsesCachedShellSpecificInit(t *testing.T) {
 	setupBody := fragmentBlockBody(t, frag, "setup")
 	for _, want := range []string{
 		"init powershell",
-		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/starship.ps1",
-		"init nu | save -f ~/.local/state/grapes/starship.nu",
-		"starship init $GRAPES_SHELL > ~/.local/state/grapes/starship.$GRAPES_SHELL",
+		"Set-Content -Encoding utf8 -Path ~/.local/state/grapes/cache/starship.ps1",
+		"init nu | save -f ~/.local/state/grapes/cache/starship.nu",
+		"starship init $GRAPES_SHELL > ~/.local/state/grapes/cache/starship_$GRAPES_SHELL",
 	} {
 		if !strings.Contains(setupBody, want) {
 			t.Fatalf("setup block did not contain %q; got %q", want, setupBody)

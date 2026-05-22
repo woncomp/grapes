@@ -1,0 +1,29 @@
+---
+phase: main
+depend_executable:
+  binary: zsh
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+
+---
+phase: env
+---
+
+--#ifdef PWSH
+
+--#elif NUSHELL
+
+--#else
+
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+export ZDOTDIR=${XDG_CONFIG_HOME}/zsh
+export ZCOMPDUMP=~/.cache/.zcompdump
+export ZSH_COMPDUMP=~/.cache/.zcompdump-$HOST
+export HISTFILE=~/.cache/zsh_history
+export DISABLE_AUTO_UPDATE=true
+
+skip_global_compinit=1
+
+--#endif

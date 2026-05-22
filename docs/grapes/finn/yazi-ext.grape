@@ -1,0 +1,75 @@
+---
+phase: main
+depend_executable:
+  binary: yazi
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+
+
+--#ifdef PWSH
+
+function y {
+	$tmp = [System.IO.Path]::GetTempFileName()
+	yazi @args --cwd-file $tmp
+	$cwd = (Get-Content -Raw -Path $tmp).TrimEnd("`r", "`n")
+	if ($cwd -and $cwd -ne (Get-Location).Path) {
+		Set-Location -Path $cwd
+	}
+	Remove-Item -Path $tmp
+}
+
+function yaz {
+	$tmp = [System.IO.Path]::GetTempFileName()
+	yazi @args --cwd-file $tmp
+	$cwd = (Get-Content -Raw -Path $tmp).TrimEnd("`r", "`n")
+	Remove-Item -Path $tmp
+	$cwd
+}
+
+--#elif NUSHELL
+
+def --env y [...args] {
+	let tmp = (mktemp -t "yazi-cwd.XXXXXX")
+	yazi ...$args --cwd-file $tmp
+	let cwd = (open $tmp)
+	if $cwd != "" and $cwd != $env.PWD {
+		cd $cwd
+	}
+	rm -fp $tmp
+}
+
+def --env yaz [...args] {
+	let tmp = (mktemp -t "yazi-cwd.XXXXXX")
+	yazi ...$args --cwd-file $tmp
+	let cwd = (open $tmp)
+	rm -fp $tmp
+    echo $cwd
+}
+
+--#elif ZSH
+
+y() {
+	local tmp cwd
+	tmp="$(mktemp -t yazi-cwd.XXXXXX)"
+	yazi "$@" --cwd-file "$tmp"
+	cwd="$(<"$tmp")"
+	if [[ -n $cwd && $cwd != "$PWD" ]]; then
+		cd -- "$cwd"
+	fi
+	rm -f -- "$tmp"
+}
+
+yaz() {
+	local tmp cwd
+	tmp="$(mktemp -t yazi-cwd.XXXXXX)"
+	yazi "$@" --cwd-file "$tmp"
+	cwd="$(<"$tmp")"
+	rm -f -- "$tmp"
+	print -r -- "$cwd"
+}
+
+--#else
+
+--#endif
