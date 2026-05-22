@@ -3,6 +3,7 @@ package shells
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -156,7 +157,7 @@ func configDir(goos string, lookupEnv func(string) (string, bool), appName strin
 
 func targetPath(goos string, elements ...string) string {
 	if goos != "windows" {
-		return filepath.Join(elements...)
+		return path.Join(elements...)
 	}
 
 	joined := strings.Join(elements, `\`)

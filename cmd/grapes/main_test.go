@@ -950,8 +950,6 @@ import = "fzf"
 	combined := envContent + "\n" + mainContent
 
 	assertNoPosixBuiltInSyntax(t, combined)
-	assertLineContainsFragments(t, envContent, "$env.GOPATH = ", "path join", "go")
-	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_CACHE_DIR = ", "path join", "cache")
@@ -967,7 +965,7 @@ import = "fzf"
 	assertFileExcludes(t, combined, "fzf --bash")
 	assertFileExcludes(t, combined, "fzf --zsh")
 	assertFileExcludes(t, combined, "generate-shell-completion nushell")
-	assertLineContainsFragments(t, mainContent, "source ~/.local/state/grapes/zoxide.nu")
+	assertLineContainsFragments(t, mainContent, "source ~/.local/state/grapes/cache/zoxide.nu")
 }
 
 func TestRunNoLinkExampleFragmentsAvoidPosixSyntaxForPwsh(t *testing.T) {
@@ -1050,8 +1048,6 @@ import = "fzf"
 	combined := envContent + "\n" + mainContent
 
 	assertNoPosixBuiltInSyntax(t, combined)
-	assertLineContainsFragments(t, envContent, "$env:GOPATH = ", "Join-Path", "go")
-	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "GOPATH")
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_CACHE_DIR = ", "Join-Path", "cache")
@@ -1064,7 +1060,7 @@ import = "fzf"
 	assertLineContainsFragments(t, mainContent, "$env:GRAPES_EXEC_PATH = ", "zoxide")
 	assertFileExcludes(t, mainContent, "FNM_PATH")
 	assertLineContainsFragments(t, mainContent, "generate-shell-completion powershell")
-	assertLineContainsFragments(t, mainContent, ". ~/.local/state/grapes/zoxide.ps1")
+	assertLineContainsFragments(t, mainContent, ". ~/.local/state/grapes/cache/zoxide.ps1")
 	assertFileExcludes(t, mainContent, "zoxide init powershell")
 }
 

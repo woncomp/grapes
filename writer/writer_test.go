@@ -22,7 +22,7 @@ func TestWriteBasic(t *testing.T) {
 		{Filename: "zshrc", Fragments: fragments[1:]},
 	}
 
-	if err := Write(dir, outputs); err != nil {
+	if err := Write("linux", dir, outputs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -73,7 +73,7 @@ func TestWriteCreatesDirectory(t *testing.T) {
 		{Filename: "bashrc"},
 	}
 
-	if err := Write(target, outputs); err != nil {
+	if err := Write("linux", target, outputs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +90,7 @@ func TestWriteEmptyPhase(t *testing.T) {
 		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "echo hi\n"}}},
 	}
 
-	if err := Write(dir, outputs); err != nil {
+	if err := Write("linux", dir, outputs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,7 +116,7 @@ func TestWriteSkipsDividerForInternalFragments(t *testing.T) {
 		},
 	}
 
-	if err := Write(dir, outputs); err != nil {
+	if err := Write("linux", dir, outputs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -147,7 +147,7 @@ func TestWriteAddsCleanupDividerForCleanupFragment(t *testing.T) {
 		},
 	}
 
-	if err := Write(dir, outputs); err != nil {
+	if err := Write("linux", dir, outputs); err != nil {
 		t.Fatal(err)
 	}
 
@@ -169,12 +169,18 @@ func TestWriteAddsCleanupDividerForCleanupFragment(t *testing.T) {
 }
 
 func TestWriteMkdirAllError(t *testing.T) {
+	dir := t.TempDir()
+	blocked := filepath.Join(dir, "blocked")
+	if err := os.WriteFile(blocked, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	outputs := []OutputFile{
 		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
 	}
-	err := Write("/dev/null/subdir", outputs)
+	err := Write("linux", filepath.Join(blocked, "subdir"), outputs)
 	if err == nil {
-		t.Error("expected error for MkdirAll on /dev/null/subdir")
+		t.Error("expected error for MkdirAll on blocked path")
 	}
 }
 
@@ -188,8 +194,62 @@ func TestWriteFileError(t *testing.T) {
 	outputs := []OutputFile{
 		{Filename: "bashrc", Fragments: []Fragment{{Name: "test", Content: "hi\n"}}},
 	}
-	err := Write(filepath.Join(blockFile, "sub"), outputs)
+	err := Write("linux", filepath.Join(blockFile, "sub"), outputs)
 	if err == nil {
 		t.Error("expected error when writing to blocked path")
+	}
+}
+
+func TestWriteNormalizesLinuxLineEndings(t *testing.T) {
+	dir := t.TempDir()
+
+	outputs := []OutputFile{
+		{
+			Filename: "bashrc",
+			Fragments: []Fragment{
+				{Name: "__GRAPE_ENV", Content: "export GRAPES=1\r\n"},
+				{Name: "fnm", Content: "echo fnm\r\necho node\r\n"},
+			},
+		},
+	}
+
+	if err := Write("linux", dir, outputs); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "bashrc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := string(data)
+	if strings.Contains(got, "\r") {
+		t.Fatalf("linux output should use LF only, got %q", got)
+	}
+}
+
+func TestWritePreservesWindowsLineEndings(t *testing.T) {
+	dir := t.TempDir()
+
+	outputs := []OutputFile{
+		{
+			Filename: "pwsh-profile.ps1",
+			Fragments: []Fragment{
+				{Name: "fnm", Content: "Write-Host 'fnm'\r\n"},
+			},
+		},
+	}
+
+	if err := Write("windows", dir, outputs); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "pwsh-profile.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(data), "\r\n") {
+		t.Fatalf("windows output should preserve CRLF content, got %q", string(data))
 	}
 }
