@@ -44,12 +44,17 @@ func ParseGrapesFile(path string) (*GrapesFile, error) {
 func parseGrapesContent(name, content, path string) (*GrapesFile, error) {
 	grapes := &GrapesFile{Name: name, Path: path}
 
+	normalizedPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("normalizing %s: %w", path, err)
+	}
+
 	var doc grapesDocument
 	if err := toml.Unmarshal([]byte(content), &doc); err != nil {
 		return nil, fmt.Errorf("parsing TOML in %s: %w", path, err)
 	}
 
-	baseDir := filepath.Dir(path)
+	baseDir := filepath.Dir(normalizedPath)
 	for i, entry := range doc.Grapes {
 		normalized, err := normalizeGrapeImport(baseDir, entry)
 		if err != nil {

@@ -1883,6 +1883,67 @@ import = "tool.grape"
 	}
 }
 
+func TestRunLoadsRelativeMasterPathFromProjectRoot(t *testing.T) {
+	home := t.TempDir()
+	appData := ""
+	projectDir := t.TempDir()
+	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		appData = t.TempDir()
+		t.Setenv("APPDATA", appData)
+	}
+
+	writeTempFile(t, filepath.Join(projectDir, "docs"), "grapes.toml", `[[grape]]
+import = "grapes/zoxide"
+
+[[grape]]
+import = "grapes/fnm"
+`)
+	writeTempFile(t, filepath.Join(projectDir, "docs", "grapes"), "zoxide.grape", `echo zoxide
+`)
+	writeTempFile(t, filepath.Join(projectDir, "docs", "grapes"), "fnm.grape", `echo fnm
+`)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Errorf("restoring working directory: %v", err)
+		}
+	})
+
+	target := mustParseShell(t, "bash")
+	if err := runWithOptions(runOptions{
+		masterPath: "./docs/grapes.toml",
+		targets:    []shells.Shell{target},
+		lookupEnv:  os.LookupEnv,
+		goos:       runtime.GOOS,
+		stdin:      strings.NewReader(""),
+		stdout:     &bytes.Buffer{},
+		assumeYes:  true,
+		noLink:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	outputDir := expectedRunOutputDir(t, home, appData)
+	mainContent := mustReadFile(t, filepath.Join(outputDir, "bashrc"))
+	if !strings.Contains(mainContent, "# ==== grape: grapes/zoxide") {
+		t.Fatalf("bashrc missing grapes/zoxide label: %q", mainContent)
+	}
+	if !strings.Contains(mainContent, "# ==== grape: grapes/fnm") {
+		t.Fatalf("bashrc missing grapes/fnm label: %q", mainContent)
+	}
+	if !strings.Contains(mainContent, "echo zoxide") || !strings.Contains(mainContent, "echo fnm") {
+		t.Fatalf("bashrc missing expected fragment bodies: %q", mainContent)
+	}
+}
+
 func TestRunDeduplicatesNormalizedMasterImports(t *testing.T) {
 	home := t.TempDir()
 	appData := ""

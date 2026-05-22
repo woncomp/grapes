@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -80,6 +81,37 @@ import = "../shared/prompt.grape"
 		t.Fatalf("Imports[0].Label = %q, want %q", got, want)
 	}
 	if got, want := grapes.Imports[0].ResolvedPath, filepath.Join(dir, "shared", "prompt.grape"); got != want {
+		t.Fatalf("Imports[0].ResolvedPath = %q, want %q", got, want)
+	}
+}
+
+func TestParseGrapesFileSupportsRelativeMasterPathFromProjectRoot(t *testing.T) {
+	projectDir := t.TempDir()
+	writeTempFile(t, filepath.Join(projectDir, "docs"), "grapes.toml", `
+[[grape]]
+import = "grapes/zoxide"
+`)
+	writeTempFile(t, filepath.Join(projectDir, "docs", "grapes"), "zoxide.grape", "echo zoxide\n")
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(projectDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Errorf("restoring working directory: %v", err)
+		}
+	})
+
+	grapes, err := ParseGrapesFile("./docs/grapes.toml")
+	if err != nil {
+		t.Fatalf("ParseGrapesFile() returned error: %v", err)
+	}
+
+	if got, want := grapes.Imports[0].ResolvedPath, filepath.Join(projectDir, "docs", "grapes", "zoxide.grape"); got != want {
 		t.Fatalf("Imports[0].ResolvedPath = %q, want %q", got, want)
 	}
 }
