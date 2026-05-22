@@ -1,0 +1,143 @@
+---
+phase: main
+depend_executable:
+  binary: fzf
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+
+
+--#ifdef PWSH
+
+function Get-FavoritesFile {
+    $base = [Environment]::GetFolderPath("LocalApplicationData")
+    if (-not $base) {
+        $base = Join-Path $HOME ".local\\share"
+    }
+    $path = Join-Path $base "nushell\\favorites.txt"
+    $dir = Split-Path -Parent $path
+
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+        New-Item -ItemType Directory -Path $dir | Out-Null
+    }
+
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        New-Item -ItemType File -Path $path | Out-Null
+    }
+
+    $path
+}
+
+function fav {
+    $path = Get-FavoritesFile
+    $value = ($args -join " ")
+    if (-not $value.EndsWith("`n")) {
+        $value += "`n"
+    }
+    Add-Content -Path $path -Value $value -NoNewline
+}
+
+function faz {
+    $path = Get-FavoritesFile
+    $selection = Get-Content -Raw -Path $path | fzf
+
+    if ($selection) {
+        Set-Clipboard -Value $selection
+    }
+
+    $selection
+}
+
+--#elif NUSHELL
+def ensure_favorites_file [] {
+    let path = ($env.LOCALAPPDATA | path join "nushell" "favorites.txt")
+    let dir = ($path | path dirname)
+
+    if not ($dir | path exists) {
+        mkdir $dir
+    }
+
+    if not ($path | path exists) {
+        "" | save --raw $path
+    }
+
+    $path
+}
+
+
+def fav [...args: string] {
+    let path = (ensure_favorites_file)
+    let value = ($args | str join " ")
+    let entry = if ($value | str ends-with (char newline)) {
+        $value
+    } else {
+        $value + (char newline)
+    }
+
+    $entry | save --raw --append $path
+}
+
+def faz [] {
+    let path = (ensure_favorites_file)
+    let selection = (open --raw $path | ^fzf)
+
+    if $selection != "" {
+        $selection | ^clip
+    }
+
+    $selection
+}
+--#elif ZSH
+ensure_favorites_file() {
+    local base path dir
+    base=${LOCALAPPDATA:-$HOME/.local/share}
+    path="$base/nushell/favorites.txt"
+    dir=${path:h}
+
+    if [[ ! -d $dir ]]; then
+        /usr/bin/mkdir -p -- "$dir"
+    fi
+
+    if [[ ! -e $path ]]; then
+        : > "$path"
+    fi
+
+    print -r -- "$path"
+}
+
+
+fav() {
+    local path value
+    path="$(ensure_favorites_file)"
+    value="$*"
+
+    if [[ $value == *$'\n' ]]; then
+        print -rn -- "$value" >> "$path"
+    else
+        print -r -- "$value" >> "$path"
+    fi
+}
+
+faz() {
+    local path selection
+    path="$(ensure_favorites_file)"
+    selection="$(fzf < "$path")"
+
+    if [[ -n $selection ]]; then
+        if (( $+commands[pbcopy] )); then
+            print -rn -- "$selection" | pbcopy
+        elif (( $+commands[wl-copy] )); then
+            print -rn -- "$selection" | wl-copy
+        elif (( $+commands[xclip] )); then
+            print -rn -- "$selection" | xclip -selection clipboard
+        elif (( $+commands[clip] )); then
+            print -rn -- "$selection" | clip
+        fi
+    fi
+
+    print -r -- "$selection"
+}
+--#else
+
+--#endif

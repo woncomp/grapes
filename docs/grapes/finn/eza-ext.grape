@@ -1,0 +1,29 @@
+---
+phase: main
+depend_executable:
+  binary: eza
+  version_args:
+    - --version
+  version_regex: "([0-9]+\\.[0-9]+\\.[0-9]+)"
+---
+
+
+--#ifdef PWSH
+
+function ls_eza { eza -l --icons $args }; Set-Alias ls ls_eza
+function lsa_eza { eza -la --icons $args }; Set-Alias lsa lsa_eza 
+function lst_eza { eza -l --tree --level=2 --icons $args }; Set-Alias lst lst_eza
+
+--#elif NUSHELL
+
+alias ls = eza -l --icons
+alias lsa = eza -la --icons
+alias lst = eza -l --tree --level=2 --icons
+
+--#else
+
+alias ls="eza -l --icons"
+alias lsa="eza -la --icons"
+alias lst="eza -l --tree --level=2 --icons"
+
+--#endif
