@@ -1,8 +1,13 @@
 [[grape]]
-import = "zoxide"
+import = "grapes/zoxide"
 
 [[grape]]
-import = "fnm"
+import = "grapes/fnm"
 
 [[grape]]
 import = "starship"
+from = "grapes"
+
+[[grape]]
+import = "bun"
+from = "grapes"

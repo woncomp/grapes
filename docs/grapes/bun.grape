@@ -14,10 +14,7 @@ $env:PATH = (Join-Path $env:BUN_INSTALL "bin") + [System.IO.Path]::PathSeparator
 --#elif NUSHELL
 $env.BUN_INSTALL = ($env.BUN_INSTALL? | default ($env.HOME | path join ".bun"))
 $env.PATH = ($env.PATH | prepend ($env.BUN_INSTALL | path join "bin"))
---#elif ZSH
-export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
-export PATH="$BUN_INSTALL/bin:$PATH"
---#elif BASH
+--#else
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 export PATH="$BUN_INSTALL/bin:$PATH"
 --#endif
