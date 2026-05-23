@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.sh
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.ps1 |  Invoke-Expression
+irm https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.ps1 | iex
 ```
 
 Both scripts download the matching asset from the latest GitHub release, verify its SHA-256 checksum, and always print the full installed executable path. A POSIX `--user` install also checks whether `grapes` is on `PATH` and tells you to add `~/.local/bin` if needed. Override the target directory with `GRAPES_INSTALL_DIR`.
