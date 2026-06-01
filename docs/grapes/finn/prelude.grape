@@ -1,0 +1,38 @@
+---
+phase: main
+---
+
+--#ifdef PWSH
+Set-Alias which Get-Command
+
+--#elif NUSHELL
+
+--#else
+
+--#endif
+
+---
+phase: env
+---
+
+--#ifdef PWSH
+if ($env:GRAPES_OS_NAME -eq 'windows') {
+    $env:MTB_DOT_DIR = 'C:\User\dotfiles'
+} else {
+    $env:MTB_DOT_DIR = '/mnt/c/User/dotfiles'
+}
+
+--#elif NUSHELL
+if $env.GRAPES_OS_NAME == 'windows' {
+    $env.MTB_DOT_DIR = 'C:\User\dotfiles'
+} else {
+    $env.MTB_DOT_DIR = '/mnt/c/User/dotfiles'
+}
+
+--#else
+if [[ $GRAPES_OS_NAME == "windows" ]]; then
+        export MTB_DOT_DIR='C:\User\dotfiles'
+else
+        export MTB_DOT_DIR='/mnt/c/User/dotfiles'
+fi
+--#endif

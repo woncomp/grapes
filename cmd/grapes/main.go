@@ -426,7 +426,7 @@ func runWithOptions(opts runOptions) error {
 			var shellFragments []writer.Fragment
 			hasGrapeFragments := false
 			if phase == shells.PhaseEnv {
-				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir, grapesHome)
+				injectedLines := preprocessor.InjectedEnvLines(target.Name(), opts.goos, outputDir, grapesHome)
 				shellFragments = append(shellFragments, writer.Fragment{
 					Name:    "__GRAPE_ENV",
 					Content: strings.Join(injectedLines, "\n") + "\n",
@@ -465,7 +465,7 @@ func runWithOptions(opts runOptions) error {
 				if !hasGrapeFragments {
 					continue
 				}
-				injectedLines := preprocessor.InjectedEnvLines(target.Name(), outputDir, grapesHome)
+				injectedLines := preprocessor.InjectedEnvLines(target.Name(), opts.goos, outputDir, grapesHome)
 				shellFragments = append([]writer.Fragment{{
 					Name:    "__GRAPE_ENV",
 					Content: strings.Join(injectedLines, "\n") + "\n",

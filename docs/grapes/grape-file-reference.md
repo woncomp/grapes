@@ -197,6 +197,7 @@ Behavior:
 Generated `env` outputs inject:
 
 - `GRAPES_SHELL`: the canonical target shell name
+- `GRAPES_OS_NAME`: the current OS name (`windows`, `linux`, or `macos`)
 - `GRAPES_HOME`: the directory that contains the master `.toml` file
 - `GRAPES_OUTPUT_DIR`: the managed output directory that contains the generated files
 - `GRAPES_CACHE_DIR`: the `cache` subdirectory under `GRAPES_OUTPUT_DIR`

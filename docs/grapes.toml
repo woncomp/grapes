@@ -1,5 +1,8 @@
 
 [[grape]]
+import = "grapes/finn/prelude"
+
+[[grape]]
 import = "grapes/finn/zsh-startup"
 
 [[grape]]

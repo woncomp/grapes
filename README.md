@@ -12,29 +12,22 @@ The repository publishes release assets for `linux`, `darwin`, and `windows` on 
 
 **POSIX**
 
+System install to /usr/local/bin
 ```sh
-# System install to /usr/local/bin
 curl -fsSL https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.sh | sudo sh
 ```
 
+User install to ~/.local/bin
 ```sh
-# User install to ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.sh | sh -s -- --user
 ```
 
 **PowerShell**
 
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.ps1|iex"
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.ps1 | iex
 ```
-
-For older Windows PowerShell that does not negotiate TLS 1.2 by default:
-
-```powershell
-powershell -c "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/woncomp/grapes/main/docs/install.ps1|iex"
-```
-
-The PowerShell installer defaults to `%LOCALAPPDATA%\Microsoft\WindowsApps`. The POSIX installer defaults to `/usr/local/bin`, and `--user` installs into `~/.local/bin` without `sudo`.
 
 Both scripts download the matching asset from the latest GitHub release, verify its SHA-256 checksum, and always print the full installed executable path. A POSIX `--user` install also checks whether `grapes` is on `PATH` and tells you to add `~/.local/bin` if needed. Override the target directory with `GRAPES_INSTALL_DIR`.
 

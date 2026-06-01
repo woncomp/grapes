@@ -214,15 +214,54 @@ func installBlock(installLines []string) string {
 }
 
 func installedContent(existing string, installLines []string) string {
-	if strings.Contains(existing, markerStart) {
-		existing = removeMarkerBlock(existing)
+	newBlock := installBlock(installLines)
+
+	if blockStr, startLine, endLine, found := getMarkerBlock(existing); found {
+		newBlockContent := strings.Join(installLines, "\n")
+		if blockStr == newBlockContent {
+			return existing
+		}
+
+		lines := strings.Split(existing, "\n")
+		newBlockLines := strings.Split(newBlock, "\n")
+		if len(newBlockLines) > 0 && newBlockLines[len(newBlockLines)-1] == "" {
+			newBlockLines = newBlockLines[:len(newBlockLines)-1]
+		}
+
+		var result []string
+		result = append(result, lines[:startLine]...)
+		result = append(result, newBlockLines...)
+		result = append(result, lines[endLine+1:]...)
+		return strings.Join(result, "\n")
 	}
 
 	trimmed := strings.TrimRight(existing, "\n")
 	if trimmed == "" {
-		return installBlock(installLines)
+		return newBlock
 	}
-	return trimmed + "\n" + installBlock(installLines)
+	return trimmed + "\n" + newBlock
+}
+
+func getMarkerBlock(content string) (blockStr string, startLine, endLine int, found bool) {
+	lines := strings.Split(content, "\n")
+	startLine = -1
+
+	for i, line := range lines {
+		if strings.TrimSpace(line) == markerStart {
+			startLine = i
+		}
+		if strings.TrimSpace(line) == markerEnd && startLine >= 0 {
+			endLine = i
+			break
+		}
+	}
+
+	if startLine >= 0 && endLine > startLine {
+		innerLines := lines[startLine+1 : endLine]
+		blockStr = strings.Join(innerLines, "\n")
+		return blockStr, startLine, endLine, true
+	}
+	return "", -1, -1, false
 }
 
 func readRCFile(rcFile string) (string, error) {

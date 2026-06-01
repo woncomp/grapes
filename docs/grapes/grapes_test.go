@@ -212,6 +212,68 @@ func TestStarshipExampleUsesCachedShellSpecificInit(t *testing.T) {
 	}
 }
 
+func TestPreludeExampleUsesGrapesOsNameAndWhereAlias(t *testing.T) {
+	frag, err := parser.ParseGrapeFile(filepath.Join("finn", "prelude.grape"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mainBody := fragmentBlockBody(t, frag, "main")
+	mainTests := map[string][]string{
+		"pwsh":    []string{"Set-Alias where Get-Command"},
+		"nushell": []string{"alias where = which"},
+		"bash":    []string{`alias where='command -v'`},
+		"zsh":     []string{`alias where='command -v'`},
+	}
+	for shell, wants := range mainTests {
+		rendered, err := preprocessor.Process(mainBody, shell)
+		if err != nil {
+			t.Fatalf("preprocessing main block for %s failed: %v", shell, err)
+		}
+		for _, want := range wants {
+			if !strings.Contains(rendered, want) {
+				t.Fatalf("%s main output did not contain %q; got %q", shell, want, rendered)
+			}
+		}
+	}
+
+	envBody := fragmentBlockBody(t, frag, "env")
+	tests := map[string][]string{
+		"pwsh": {
+			"$env:GRAPES_OS_NAME -eq 'windows'",
+			`$env:MTB_DOT_DIR = 'C:\User\dotfiles'`,
+			`$env:MTB_DOT_DIR = '/mnt/c/User/dotfiles'`,
+		},
+		"nushell": {
+			"$env.GRAPES_OS_NAME == 'windows'",
+			`$env.MTB_DOT_DIR = 'C:\User\dotfiles'`,
+			`$env.MTB_DOT_DIR = '/mnt/c/User/dotfiles'`,
+		},
+		"bash": {
+			`if [[ $GRAPES_OS_NAME == "windows" ]]; then`,
+			`export MTB_DOT_DIR='C:\User\dotfiles'`,
+			`export MTB_DOT_DIR='/mnt/c/User/dotfiles'`,
+		},
+		"zsh": {
+			`if [[ $GRAPES_OS_NAME == "windows" ]]; then`,
+			`export MTB_DOT_DIR='C:\User\dotfiles'`,
+			`export MTB_DOT_DIR='/mnt/c/User/dotfiles'`,
+		},
+	}
+
+	for shell, wants := range tests {
+		rendered, err := preprocessor.Process(envBody, shell)
+		if err != nil {
+			t.Fatalf("preprocessing for %s failed: %v", shell, err)
+		}
+		for _, want := range wants {
+			if !strings.Contains(rendered, want) {
+				t.Fatalf("%s output did not contain %q; got %q", shell, want, rendered)
+			}
+		}
+	}
+}
+
 func fragmentBlockBody(t *testing.T, frag *parser.GrapeFile, phase string) string {
 	t.Helper()
 
