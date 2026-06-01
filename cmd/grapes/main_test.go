@@ -869,6 +869,9 @@ echo prompt
 	if got, want := strings.Count(envContent, `GRAPES_SHELL="zsh"`), 1; got != want {
 		t.Fatalf("env GRAPES_SHELL count = %d, want %d; content=%q", got, want, envContent)
 	}
+	if got, want := strings.Count(envContent, `GRAPES_OS_NAME="`+expectedGrapesOSName(runtime.GOOS)+`"`), 1; got != want {
+		t.Fatalf("env GRAPES_OS_NAME count = %d, want %d; content=%q", got, want, envContent)
+	}
 	if got, want := strings.Count(envContent, `GRAPES_HOME="`+expectedInjectedPath("zsh", sourceDir)+`"`), 1; got != want {
 		t.Fatalf("env GRAPES_HOME count = %d, want %d; content=%q", got, want, envContent)
 	}
@@ -950,6 +953,7 @@ import = "fzf"
 	combined := envContent + "\n" + mainContent
 
 	assertNoPosixBuiltInSyntax(t, combined)
+	assertLineContainsFragments(t, envContent, "$env.GRAPES_OS_NAME = ", expectedGrapesOSName(runtime.GOOS))
 	assertLineContainsFragments(t, envContent, "$env.BUN_INSTALL = ", "path join", ".bun")
 	assertLineContainsFragments(t, envContent, "$env.PATH = ", "prepend", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env.GRAPES_CACHE_DIR = ", "path join", "cache")
@@ -1048,6 +1052,7 @@ import = "fzf"
 	combined := envContent + "\n" + mainContent
 
 	assertNoPosixBuiltInSyntax(t, combined)
+	assertLineContainsFragments(t, envContent, "$env:GRAPES_OS_NAME = ", expectedGrapesOSName(runtime.GOOS))
 	assertLineContainsFragments(t, envContent, "$env:BUN_INSTALL = ", "Join-Path", ".bun")
 	assertLineContainsFragments(t, envContent, "$env:PATH = ", "Join-Path", "BUN_INSTALL")
 	assertLineContainsFragments(t, envContent, "$env:GRAPES_CACHE_DIR = ", "Join-Path", "cache")
@@ -2074,6 +2079,15 @@ func expectedInjectedPath(shellName string, path string) string {
 		return strings.ReplaceAll(path, `\`, "/")
 	default:
 		return path
+	}
+}
+
+func expectedGrapesOSName(goos string) string {
+	switch goos {
+	case "darwin":
+		return "macos"
+	default:
+		return goos
 	}
 }
 

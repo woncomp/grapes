@@ -36,6 +36,25 @@ func TestShellInjection(t *testing.T) {
 	}
 }
 
+func TestOSNameInjection(t *testing.T) {
+	tests := []struct {
+		shell string
+		goos  string
+		want  string
+	}{
+		{shell: "bash", goos: "linux", want: `export GRAPES_OS_NAME="linux"`},
+		{shell: "zsh", goos: "darwin", want: `export GRAPES_OS_NAME="macos"`},
+		{shell: "nushell", goos: "windows", want: `$env.GRAPES_OS_NAME = 'windows'`},
+		{shell: "pwsh", goos: "darwin", want: `$env:GRAPES_OS_NAME = 'macos'`},
+	}
+
+	for _, tt := range tests {
+		if got := OSNameInjectionLine(tt.shell, tt.goos); got != tt.want {
+			t.Errorf("OSNameInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.goos, got, tt.want)
+		}
+	}
+}
+
 func TestOutputDirInjection(t *testing.T) {
 	tests := []struct {
 		shell      string
@@ -137,6 +156,21 @@ func TestCacheDirInjection(t *testing.T) {
 	for _, tt := range tests {
 		if got := CacheDirInjectionLine(tt.shell, tt.outputPath); got != tt.want {
 			t.Errorf("CacheDirInjectionLine(%q, %q) = %q, want %q", tt.shell, tt.outputPath, got, tt.want)
+		}
+	}
+}
+
+func TestGrapesOSName(t *testing.T) {
+	tests := map[string]string{
+		"windows": "windows",
+		"linux":   "linux",
+		"darwin":  "macos",
+		"freebsd": "freebsd",
+	}
+
+	for goos, want := range tests {
+		if got := grapesOSName(goos); got != want {
+			t.Errorf("grapesOSName(%q) = %q, want %q", goos, got, want)
 		}
 	}
 }

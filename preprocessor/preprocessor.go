@@ -62,6 +62,17 @@ func ShellInjectionLine(shell string) string {
 	}
 }
 
+func OSNameInjectionLine(shell, goos string) string {
+	switch strings.ToLower(shell) {
+	case "nushell":
+		return fmt.Sprintf(`$env.GRAPES_OS_NAME = %s`, renderer.QuoteValue(shell, grapesOSName(goos)))
+	case "pwsh":
+		return fmt.Sprintf(`$env:GRAPES_OS_NAME = %s`, renderer.QuoteValue(shell, grapesOSName(goos)))
+	default:
+		return fmt.Sprintf(`export GRAPES_OS_NAME=%s`, renderer.QuoteValue(shell, grapesOSName(goos)))
+	}
+}
+
 func OutputDirInjectionLine(shell string, outputPath string) string {
 	switch strings.ToLower(shell) {
 	case "bash", "zsh":
@@ -104,12 +115,26 @@ func CacheDirInjectionLine(shell string, outputPath string) string {
 	}
 }
 
-func InjectedEnvLines(shell string, outputPath string, homePath string) []string {
+func InjectedEnvLines(shell, goos string, outputPath string, homePath string) []string {
 	return []string{
 		ShellInjectionLine(shell),
+		OSNameInjectionLine(shell, goos),
 		HomeInjectionLine(shell, homePath),
 		OutputDirInjectionLine(shell, outputPath),
 		CacheDirInjectionLine(shell, outputPath),
+	}
+}
+
+func grapesOSName(goos string) string {
+	switch goos {
+	case "windows":
+		return "windows"
+	case "linux":
+		return "linux"
+	case "darwin":
+		return "macos"
+	default:
+		return goos
 	}
 }
 
