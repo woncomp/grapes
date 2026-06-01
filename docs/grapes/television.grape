@@ -35,9 +35,9 @@ phase: env
 ---
 
 --#ifdef PWSH
-$env:TELEVISION_CONFIG = "$env:GRAPES_HOME/config/television"
+$env:TELEVISION_CONFIG = "$env:MTB_DOT_DIR/config/television"
 --#elif NUSHELL
-$env.TELEVISION_CONFIG = ($env.GRAPES_HOME | path join "config/television")
+$env.TELEVISION_CONFIG = ($env.MTB_DOT_DIR | path join "config/television")
 --#else
-export TELEVISION_CONFIG=$GRAPES_HOME/config/television
+export TELEVISION_CONFIG=$MTB_DOT_DIR/config/television
 --#endif
