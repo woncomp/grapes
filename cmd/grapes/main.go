@@ -672,7 +672,7 @@ func grapeIdentityKey(grape *parser.GrapeFile) string {
 func renderGrapeScopePrefix(shell string, result grapeDependencyResult) (string, error) {
 	execPath, ok := grapeExecutableLocation(result)
 	if !ok {
-		return renderer.RenderGrapeExecCleanup(shell)
+		return "", nil
 	}
 	return renderer.RenderGrapeExecScope(shell, execPath, filepath.Dir(execPath), grapeExecutableVersion(result))
 }

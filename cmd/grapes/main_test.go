@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/woncomp/grapes/parser"
 	"github.com/woncomp/grapes/shells"
 )
 
@@ -1168,13 +1169,35 @@ echo prompt-fragment
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== grape: fnm")
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== grape: prompt")
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), "# ==== cleanup variables")
-	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION"), 2; got != want {
+	if got, want := strings.Count(content, "unset GRAPES_EXEC_PATH GRAPES_EXEC_DIR GRAPES_EXEC_VERSION"), 1; got != want {
 		t.Fatalf("cleanup count = %d, want %d; content=%q", got, want, content)
 	}
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `if __grapes_path_cleaned="$("`)
 	assertFileContains(t, filepath.Join(outputDir, "bashrc"), `--path-clean "$PATH")"; then export PATH="$__grapes_path_cleaned"; fi; unset __grapes_path_cleaned`)
 	if !strings.HasSuffix(content, expectedPathCleanLine("bash")) {
 		t.Fatalf("bashrc did not end with path clean tail: %q", content)
+	}
+}
+
+func TestRenderGrapeScopePrefixSkipsCleanupForNonExecutableGrapes(t *testing.T) {
+	prefix, err := renderGrapeScopePrefix("nushell", grapeDependencyResult{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prefix != "" {
+		t.Fatalf("renderGrapeScopePrefix() = %q, want empty", prefix)
+	}
+
+	prefix, err = renderGrapeScopePrefix("nushell", grapeDependencyResult{
+		Grape: &parser.GrapeFile{DependExecutable: &parser.DependExecutable{Binary: "fnm"}},
+		Location: `C:\Users\jakzhang\scoop\shims\fnm.exe`,
+		Version:  "1.39.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(prefix, "$env.GRAPES_EXEC_PATH = 'C:\\Users\\jakzhang\\scoop\\shims\\fnm.exe'") {
+		t.Fatalf("renderGrapeScopePrefix() = %q, want executable scope prefix", prefix)
 	}
 }
 
