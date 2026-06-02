@@ -21,6 +21,7 @@ if ($env:GRAPES_OS_NAME -eq 'windows') {
 } else {
     $env:MTB_DOT_DIR = '/mnt/c/User/dotfiles'
 }
+$env:CDF_CONFIG_HOME = "$env:MTB_DOT_DIR/config"
 
 --#elif NUSHELL
 if $env.GRAPES_OS_NAME == 'windows' {
@@ -28,6 +29,7 @@ if $env.GRAPES_OS_NAME == 'windows' {
 } else {
     $env.MTB_DOT_DIR = '/mnt/c/User/dotfiles'
 }
+$env.CDF_CONFIG_HOME = ($env.MTB_DOT_DIR | path join "config")
 
 --#else
 if [[ $GRAPES_OS_NAME == "windows" ]]; then
@@ -35,4 +37,6 @@ if [[ $GRAPES_OS_NAME == "windows" ]]; then
 else
         export MTB_DOT_DIR='/mnt/c/User/dotfiles'
 fi
+export CDF_CONFIG_HOME=MTB_DOT_DIR/config
+
 --#endif
